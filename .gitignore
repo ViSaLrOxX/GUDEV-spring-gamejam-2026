@@ -1,0 +1,8 @@
+.godot/
+*.uid
+*.import
+android/
+ios/
+*.tmp
+*.remap
+*.gdc

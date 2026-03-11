@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://6LYA9p45GLEH"]
+
+[ext_resource type="Script" path="res://scripts/bullet_hit_sound.gd" id="1_script"]
+
+[node name="BulletHitSound" type="Node"]
+script = ExtResource("1_script")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]

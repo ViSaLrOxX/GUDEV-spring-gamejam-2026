@@ -1,0 +1,71 @@
+[gd_scene load_steps=2 format=3 uid="uid://chy6k5aTI5iN"]
+
+[ext_resource type="Script" path="res://scripts/menu.gd" id="1_script"]
+
+[node name="Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.06, 0.08, 1)
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -120.0
+offset_right = 140.0
+offset_bottom = 120.0
+alignment = 1
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+text = "SUPERHOT TIME"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 48
+
+[node name="Subtitle" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Time only moves when you do."
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
+
+[node name="Spacer" type="Control" parent="VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 30)
+
+[node name="PlayButton" type="Button" parent="VBox"]
+layout_mode = 2
+text = "PLAY"
+theme_override_font_sizes/font_size = 28
+
+[node name="QuitButton" type="Button" parent="VBox"]
+layout_mode = 2
+text = "QUIT"
+theme_override_font_sizes/font_size = 20
+
+[node name="Controls" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -60.0
+text = "WASD: Move   |   Mouse: Aim   |   LMB: Shoot   |   Shift: Dash (costs 3s)"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
+
+[connection signal="pressed" from="VBox/PlayButton" method="_on_play_button_pressed"]
+[connection signal="pressed" from="VBox/QuitButton" method="_on_quit_button_pressed"]
