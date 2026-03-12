@@ -1,12 +1,12 @@
 extends CharacterBody2D
 
-const MOVE_SPEED     : float = 200.0
-const SHOOT_COOLDOWN : float = 0.3
-const BULLET_SPEED   : float = 600.0
-const DASH_SPEED     : float = 700.0
-const DASH_DURATION  : float = 0.15
-const DASH_COST      : float = 3.0
-const DASH_COOLDOWN  : float = 1.0
+var move_speed      : float = 130.0
+var shoot_cooldown  : float = 0.3
+var bullet_speed    : float = 600.0
+var dash_speed      : float = 600.0
+var dash_duration   : float = 0.15
+var dash_cost       : float = 3.0
+var dash_cooldown   : float = 1.0
 
 var _shoot_timer    : float = 0.0
 var _is_moving      : bool  = false
@@ -24,20 +24,28 @@ func _ready() -> void:
 	add_to_group("player")
 	_game = get_tree().get_first_node_in_group("game")
 	_bullet_scene = load("res://scenes/bullet.tscn")
+	scale = Vector2(1.1, 1.1)
+	
+	var poly = get_node_or_null("Polygon2D")
+	if poly:
+		poly.color = Color(1.5, 1.5, 2.0) * 4.0 # Brilliant White-Blue Super-Nova
 
 func _physics_process(delta: float) -> void:
+	if not _game:
+		_game = get_tree().get_first_node_in_group("game")
+	
 	var dir := _get_input_direction()
 	_is_moving = dir.length_squared() > 0.01
 
 	_dash_cd_timer -= delta
 	if _is_dashing:
 		_dash_timer -= delta
-		velocity = _dash_dir * DASH_SPEED
+		velocity = _dash_dir * dash_speed
 		if _dash_timer <= 0.0:
 			_is_dashing      = false
 			_dash_invincible = false
 	else:
-		velocity = dir * MOVE_SPEED
+		velocity = dir * move_speed
 		if Input.is_action_just_pressed("dash") and _dash_cd_timer <= 0.0 and _is_moving:
 			_start_dash(dir)
 
@@ -55,32 +63,51 @@ func _physics_process(delta: float) -> void:
 func _start_dash(dir: Vector2) -> void:
 	_is_dashing      = true
 	_dash_invincible = true
-	_dash_timer      = DASH_DURATION
-	_dash_cd_timer   = DASH_COOLDOWN
+	_dash_timer      = dash_duration
+	_dash_cd_timer   = dash_cooldown
 	_dash_dir        = dir.normalized()
 	if _game:
-		_game.subtract_time(DASH_COST)
+		_game.subtract_time(dash_cost)
 	_tween_flash(Color(0.5, 0.8, 1.0))
 
 func _shoot() -> void:
 	if not _bullet_scene:
 		return
-	_shoot_timer = SHOOT_COOLDOWN
+	_shoot_timer = shoot_cooldown
 	_is_shooting  = true
+	
+	var mouse_pos = get_global_mouse_position()
+	var shoot_dir = global_position.direction_to(mouse_pos)
+	
+	# Lethal Intent Raycast
+	var is_lethal = false
+	var space_state = get_world_2d().direct_space_state
+	var query = PhysicsRayQueryParameters2D.create(global_position, global_position + shoot_dir * 1200.0)
+	query.collision_mask = 2 # Enemies
+	var result = space_state.intersect_ray(query)
+	if result and result.collider and result.collider.is_in_group("enemies"):
+		is_lethal = true
+
 	var bullet := _bullet_scene.instantiate() as Node2D
 	get_parent().add_child(bullet)
-	bullet.global_position = global_position + Vector2.RIGHT.rotated(global_rotation) * 20.0
+	
+	var spawn_pos = global_position + shoot_dir * 20.0
+	var marker = get_node_or_null("BulletSpawn")
+	if marker:
+		spawn_pos = marker.global_position
+		
+	bullet.global_position = spawn_pos
 	bullet.rotation        = global_rotation
 	if bullet.has_method("launch"):
-		bullet.launch(Vector2.RIGHT.rotated(global_rotation) * BULLET_SPEED)
+		bullet.launch(shoot_dir * bullet_speed)
 	if _game:
-		_game.player_shoot()
+		_game.player_shoot(is_lethal)
 
-func take_damage() -> void:
+func take_damage(amount: float = 8.0) -> void:
 	if _dash_invincible:
 		return
 	if _game:
-		_game.player_hit()
+		_game.player_hit(amount)
 	_tween_flash(Color.RED)
 
 func _get_input_direction() -> Vector2:

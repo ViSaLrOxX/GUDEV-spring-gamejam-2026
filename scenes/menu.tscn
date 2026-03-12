@@ -1,22 +1,26 @@
-[gd_scene load_steps=2 format=3 uid="uid://chy6k5aTI5iN"]
+[gd_scene format=3 uid="uid://cgxrrpaek1e41"]
 
-[ext_resource type="Script" path="res://scripts/menu.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://d1dhrpthqj1mb" path="res://scripts/menu.gd" id="1_script"]
 
-[node name="Menu" type="Control"]
+[node name="Menu" type="Control" unique_id=1394815259]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1_script")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=148840123]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 color = Color(0.06, 0.06, 0.08, 1)
 
-[node name="VBox" type="VBoxContainer" parent="."]
+[node name="VBox" type="VBoxContainer" parent="." unique_id=284935524]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -27,45 +31,47 @@ offset_left = -140.0
 offset_top = -120.0
 offset_right = 140.0
 offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
 alignment = 1
 
-[node name="Title" type="Label" parent="VBox"]
+[node name="Title" type="Label" parent="VBox" unique_id=72134325]
 layout_mode = 2
+theme_override_font_sizes/font_size = 48
 text = "SUPERHOT TIME"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 48
 
-[node name="Subtitle" type="Label" parent="VBox"]
+[node name="Subtitle" type="Label" parent="VBox" unique_id=746723479]
 layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
+theme_override_font_sizes/font_size = 18
 text = "Time only moves when you do."
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 18
-theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
 
-[node name="Spacer" type="Control" parent="VBox"]
-layout_mode = 2
+[node name="Spacer" type="Control" parent="VBox" unique_id=379495923]
 custom_minimum_size = Vector2(0, 30)
-
-[node name="PlayButton" type="Button" parent="VBox"]
 layout_mode = 2
-text = "PLAY"
+
+[node name="PlayButton" type="Button" parent="VBox" unique_id=1773438077]
+layout_mode = 2
 theme_override_font_sizes/font_size = 28
+text = "PLAY"
 
-[node name="QuitButton" type="Button" parent="VBox"]
+[node name="QuitButton" type="Button" parent="VBox" unique_id=1302017807]
 layout_mode = 2
-text = "QUIT"
 theme_override_font_sizes/font_size = 20
+text = "QUIT"
 
-[node name="Controls" type="Label" parent="."]
+[node name="Controls" type="Label" parent="." unique_id=569133522]
 layout_mode = 1
-anchor_left = 0.0
+anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_top = -60.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 text = "WASD: Move   |   Mouse: Aim   |   LMB: Shoot   |   Shift: Dash (costs 3s)"
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.5, 0.5, 0.6, 1)
 
-[connection signal="pressed" from="VBox/PlayButton" method="_on_play_button_pressed"]
-[connection signal="pressed" from="VBox/QuitButton" method="_on_quit_button_pressed"]
+[connection signal="pressed" from="VBox/PlayButton" to="." method="_on_play_button_pressed"]
+[connection signal="pressed" from="VBox/QuitButton" to="." method="_on_quit_button_pressed"]

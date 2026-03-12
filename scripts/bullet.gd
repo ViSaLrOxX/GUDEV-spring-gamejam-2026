@@ -4,7 +4,19 @@ var _velocity      : Vector2 = Vector2.ZERO
 var _particle_scene: PackedScene = null
 
 func _ready() -> void:
+	add_to_group("player_bullets")
 	_particle_scene = load("res://scenes/bullet_particle.tscn")
+	area_entered.connect(_on_area_entered)
+	
+	var poly = get_node_or_null("Polygon2D")
+	if poly:
+		poly.color = Color(1.0, 1.0, 0.6) * 5.0 # Golden-White Laser
+
+func _on_area_entered(area: Area2D) -> void:
+	if area.is_in_group("enemy_projectiles"):
+		_spawn_particle()
+		area.queue_free()
+		queue_free()
 
 func launch(vel: Vector2) -> void:
 	_velocity = vel

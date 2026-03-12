@@ -1,40 +1,63 @@
-[gd_scene load_steps=9 format=3 uid="uid://gameScene001"]
+[gd_scene load_steps=17 format=3 uid="uid://VEVzK5h9CozE"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_game"]
-[ext_resource type="Script" path="res://scripts/exit_portal.gd" id="2_portal"]
+[ext_resource type="PackedScene" path="res://scenes/player.tscn" id="2_player"]
+[ext_resource type="PackedScene" path="res://scenes/enemy.tscn" id="3_enemy"]
+[ext_resource type="PackedScene" path="res://scenes/time_crystal.tscn" id="4_crystal"]
+[ext_resource type="PackedScene" path="res://scenes/bonus_item.tscn" id="5_coin"]
+[ext_resource type="PackedScene" path="res://scenes/exit_portal.tscn" id="6_portal"]
+[ext_resource type="PackedScene" path="res://scenes/time_freeze_pickup.tscn" id="7_freeze"]
 
-[sub_resource type="RectangleShape2D" id="wall_top"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_top"]
 size = Vector2(1280, 20)
 
-[sub_resource type="RectangleShape2D" id="wall_bottom"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_bottom"]
 size = Vector2(1280, 20)
 
-[sub_resource type="RectangleShape2D" id="wall_left"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_left"]
 size = Vector2(20, 720)
 
-[sub_resource type="RectangleShape2D" id="wall_right"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_wall_right"]
 size = Vector2(20, 720)
 
-[sub_resource type="RectangleShape2D" id="obst1"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inner1"]
 size = Vector2(200, 20)
 
-[sub_resource type="RectangleShape2D" id="obst2"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inner2"]
 size = Vector2(20, 180)
 
-[sub_resource type="RectangleShape2D" id="obst3"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inner3"]
 size = Vector2(180, 20)
 
-[sub_resource type="RectangleShape2D" id="obst4"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inner4"]
 size = Vector2(20, 200)
 
-[sub_resource type="CircleShape2D" id="portal_shape"]
-radius = 60.0
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_level"]
+vertices = PackedVector2Array(20, 20, 1260, 20, 1260, 700, 20, 700)
+polygons = [PackedInt32Array(0, 1, 2, 3)]
+outlines = [PackedVector2Array(20, 20, 1260, 20, 1260, 700, 20, 700)]
+source_geometry_group_name = &"navigation_polygon_source_group"
+
+[sub_resource type="Environment" id="Environment_glow"]
+background_mode = 3
+glow_enabled = true
+glow_intensity = 0.8
+glow_strength = 1.0
+glow_blend_mode = 0
+glow_hdr_threshold = 1.0
 
 [node name="Game" type="Node2D"]
 script = ExtResource("1_game")
 
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_glow")
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+navigation_polygon = SubResource("NavigationPolygon_level")
+
 [node name="Camera2D" type="Camera2D" parent="."]
 position = Vector2(640, 360)
+zoom = Vector2(1, 1)
 
 [node name="Background" type="ColorRect" parent="."]
 position = Vector2(0, 0)
@@ -46,35 +69,35 @@ collision_layer = 6
 
 [node name="TopWall" type="CollisionShape2D" parent="Walls"]
 position = Vector2(640, 10)
-shape = SubResource("wall_top")
+shape = SubResource("RectangleShape2D_wall_top")
 
 [node name="BottomWall" type="CollisionShape2D" parent="Walls"]
 position = Vector2(640, 710)
-shape = SubResource("wall_bottom")
+shape = SubResource("RectangleShape2D_wall_bottom")
 
 [node name="LeftWall" type="CollisionShape2D" parent="Walls"]
 position = Vector2(10, 360)
-shape = SubResource("wall_left")
+shape = SubResource("RectangleShape2D_wall_left")
 
 [node name="RightWall" type="CollisionShape2D" parent="Walls"]
 position = Vector2(1270, 360)
-shape = SubResource("wall_right")
+shape = SubResource("RectangleShape2D_wall_right")
 
 [node name="Obstacle1" type="CollisionShape2D" parent="Walls"]
 position = Vector2(400, 240)
-shape = SubResource("obst1")
+shape = SubResource("RectangleShape2D_inner1")
 
 [node name="Obstacle2" type="CollisionShape2D" parent="Walls"]
 position = Vector2(850, 200)
-shape = SubResource("obst2")
+shape = SubResource("RectangleShape2D_inner2")
 
 [node name="Obstacle3" type="CollisionShape2D" parent="Walls"]
 position = Vector2(640, 460)
-shape = SubResource("obst3")
+shape = SubResource("RectangleShape2D_inner3")
 
 [node name="Obstacle4" type="CollisionShape2D" parent="Walls"]
 position = Vector2(300, 520)
-shape = SubResource("obst4")
+shape = SubResource("RectangleShape2D_inner4")
 
 [node name="WallVisuals" type="Node2D" parent="."]
 
@@ -118,34 +141,92 @@ position = Vector2(290, 420)
 size = Vector2(20, 200)
 color = Color(0.3, 0.3, 0.35, 1)
 
-[node name="ExitPortal" type="Area2D" parent="."]
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(640, 360)
+
+[node name="ExitPortal" parent="." instance=ExtResource("6_portal")]
 position = Vector2(640, 80)
-collision_layer = 0
-collision_mask = 1
-script = ExtResource("2_portal")
 
-[node name="PortalCollision" type="CollisionShape2D" parent="ExitPortal"]
-shape = SubResource("portal_shape")
+[node name="Enemy1" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(200, 200)
+enemy_type = "turret"
 
-[node name="Visual" type="Polygon2D" parent="ExitPortal"]
-color = Color(0.5, 0, 1, 0.4)
-polygon = PackedVector2Array(0, -50, 35, -35, 50, 0, 35, 35, 0, 50, -35, 35, -50, 0, -35, -35)
+[node name="Enemy2" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(1050, 180)
+enemy_type = "patrol"
+patrol_offset = Vector2(-400, 0)
 
-[node name="Inner" type="Polygon2D" parent="ExitPortal/Visual"]
-color = Color(0, 0, 0, 1)
-polygon = PackedVector2Array(0, -30, 21, -21, 30, 0, 21, 21, 0, 30, -21, 21, -30, 0, -21, -21)
+[node name="Enemy3" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(180, 580)
+enemy_type = "melee"
+move_speed = 130.0
+
+[node name="Enemy4" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(1060, 560)
+enemy_type = "ranged"
+move_speed = 60.0
+shoot_cooldown = 2.5
+
+[node name="Enemy5" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(700, 600)
+enemy_type = "patrol"
+patrol_offset = Vector2(0, -300)
+
+[node name="Enemy6" parent="." instance=ExtResource("3_enemy")]
+position = Vector2(500, 150)
+enemy_type = "melee"
+move_speed = 120.0
+
+[node name="Crystal1" parent="." instance=ExtResource("4_crystal")]
+position = Vector2(150, 150)
+
+[node name="Crystal2" parent="." instance=ExtResource("4_crystal")]
+position = Vector2(1100, 150)
+
+[node name="Crystal3" parent="." instance=ExtResource("4_crystal")]
+position = Vector2(150, 600)
+
+[node name="Crystal4" parent="." instance=ExtResource("4_crystal")]
+position = Vector2(1100, 600)
+
+[node name="Crystal5" parent="." instance=ExtResource("4_crystal")]
+position = Vector2(640, 560)
+
+[node name="Coin1" parent="." instance=ExtResource("5_coin")]
+position = Vector2(400, 150)
+
+[node name="Coin2" parent="." instance=ExtResource("5_coin")]
+position = Vector2(880, 150)
+
+[node name="Coin3" parent="." instance=ExtResource("5_coin")]
+position = Vector2(300, 450)
+
+[node name="Coin4" parent="." instance=ExtResource("5_coin")]
+position = Vector2(950, 450)
+
+[node name="Coin5" parent="." instance=ExtResource("5_coin")]
+position = Vector2(640, 280)
+
+[node name="TimeFreezePickup1" parent="." instance=ExtResource("7_freeze")]
+position = Vector2(640, 640)
+
+[node name="TimeFreezePickup2" parent="." instance=ExtResource("7_freeze")]
+position = Vector2(200, 360)
 
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="TimerLabel" type="Label" parent="UI"]
+layout_mode = 0
 offset_left = 20.0
 offset_top = 16.0
 offset_right = 300.0
 offset_bottom = 56.0
 text = "TIME  60.0"
 theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1, 1, 1, 1)
 
 [node name="CoresLabel" type="Label" parent="UI"]
+layout_mode = 0
 offset_left = 20.0
 offset_top = 56.0
 offset_right = 300.0
@@ -154,6 +235,7 @@ text = "CORES  0 / 5"
 theme_override_font_sizes/font_size = 20
 
 [node name="CoinsLabel" type="Label" parent="UI"]
+layout_mode = 0
 offset_left = 20.0
 offset_top = 84.0
 offset_right = 300.0
@@ -163,6 +245,7 @@ theme_override_font_sizes/font_size = 16
 theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
 
 [node name="ComboLabel" type="Label" parent="UI"]
+layout_mode = 0
 offset_left = 20.0
 offset_top = 112.0
 offset_right = 300.0
@@ -173,12 +256,11 @@ theme_override_colors/font_color = Color(1, 1, 0, 1)
 visible = false
 
 [node name="ControlsHint" type="Label" parent="UI"]
-offset_left = 860.0
-offset_top = 695.0
-offset_right = 1270.0
+layout_mode = 0
+offset_left = 900.0
+offset_top = 690.0
+offset_right = 1280.0
 offset_bottom = 720.0
 text = "WASD Move  |  LMB Shoot  |  Shift Dash"
 theme_override_font_sizes/font_size = 13
 theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
-
-[connection signal="body_entered" from="ExitPortal" method="_on_body_entered"]
