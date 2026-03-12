@@ -3,7 +3,7 @@ extends Node2D
 const SLOW_TIME_SCALE  : float = 0.05
 const NORMAL_TIME_SCALE: float = 1.0
 const TIME_LERP_SPEED  : float = 15.0 # Adjusted for stable formula
-const STARTING_TIME    : float = 60.0
+const STARTING_TIME    : float = 30.0
 const BASE_SHOOT_COST  : float = 5.0 
 const HIT_COST         : float = 12.0
 const BASE_KILL_REWARD : float = 6.0
@@ -232,10 +232,10 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 		fade_overlay.color = Color.BLACK
 		var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(fade_overlay, "color:a", 0.0, 0.2)
 	
-	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 5.0 + (inventory.count("TIME") * 10.0)
+	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 2.0 + (inventory.count("TIME") * 10.0)
 	for child in dynamic_entities.get_children(): child.queue_free()
 	for child in dynamic_walls.get_children(): child.queue_free()
-	var map_w = 700.0 + (level - 1) * 60.0; var map_h = 500.0 + (level - 1) * 40.0
+	var map_w = 700.0 + (level - 1) * 20.0; var map_h = 500.0 + (level - 1) * 15.0
 	_rebuild_boundaries(map_w, map_h)
 	if player: player.global_position = Vector2(map_w / 2.0, map_h / 2.0)
 	var inner_rects = _generate_inner_walls(level, map_w, map_h)
