@@ -170,12 +170,15 @@ func _setup_overscreen_hud() -> void:
 	var heat_fg = bar_fg.duplicate(); heat_fg.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("background", bar_bg); cooldown_bar.add_theme_stylebox_override("fill", heat_fg)
 
 	# 5. Economy Panel (Bottom Right)
-	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -440; br_panel.offset_bottom = -40; br_panel.offset_top = -120; br_panel.offset_right = -40; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
-	var br_vbox = VBoxContainer.new(); br_vbox.alignment = BoxContainer.ALIGNMENT_END; br_panel.add_child(br_vbox)
+	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -320; br_panel.offset_bottom = -40; br_panel.offset_top = -120; br_panel.offset_right = -40; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
+	var br_hbox = HBoxContainer.new(); br_hbox.alignment = BoxContainer.ALIGNMENT_CENTER; br_hbox.add_theme_constant_override("separation", 15); br_panel.add_child(br_hbox)
 	
-	var credit_header = Label.new(); credit_header.text = "CREDITS // UNSTABLE"; credit_header.add_theme_font_size_override("font_size", 16); credit_header.add_theme_color_override("font_outline_color", Color.BLACK); credit_header.add_theme_constant_override("outline_size", 6); credit_header.modulate = Color.GOLD * 2.0; br_vbox.add_child(credit_header)
+	# Small glowing coin icon
+	var coin_icon = Panel.new(); coin_icon.custom_minimum_size = Vector2(40, 40); br_hbox.add_child(coin_icon)
+	var icon_style = StyleBoxFlat.new(); icon_style.bg_color = Color.GOLD * 2.5; icon_style.corner_radius_top_left = 20; icon_style.corner_radius_top_right = 20; icon_style.corner_radius_bottom_left = 20; icon_style.corner_radius_bottom_right = 20; icon_style.shadow_color = Color.GOLD * 0.5; icon_style.shadow_size = 8
+	coin_icon.add_theme_stylebox_override("panel", icon_style)
 	
-	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 72); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); coins_bank_label.add_theme_color_override("font_outline_color", Color.BLACK); coins_bank_label.add_theme_constant_override("outline_size", 12); br_vbox.add_child(coins_bank_label)
+	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 64); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); coins_bank_label.add_theme_color_override("font_outline_color", Color.BLACK); coins_bank_label.add_theme_constant_override("outline_size", 12); br_hbox.add_child(coins_bank_label)
 
 	# Combo/Shop/Fade
 	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 96); combo_label.add_theme_color_override("font_outline_color", Color.BLACK); combo_label.add_theme_constant_override("outline_size", 16); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
