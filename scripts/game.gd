@@ -46,6 +46,7 @@ const HEAT_WINDOW_MS : int = 1000
 var inventory : Array = []
 var is_waiting_to_start : bool = true
 var is_shop_open : bool = false
+var is_settings_open : bool = false
 var _transition_lock_timer : float = 0.0
 const TRANSITION_DELAY : float = 0.8
 var _was_moving_on_load : bool = true
@@ -244,6 +245,11 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	if open_shop: _open_shop()
 
 func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if is_settings_open: _close_settings()
+		elif not is_shop_open: _open_settings()
+		return
+
 	if is_waiting_to_start and event.is_action_pressed("shop") and _transition_lock_timer <= 0.0:
 		if not is_shop_open: _open_shop()
 		else: _close_shop()
@@ -460,6 +466,62 @@ func _close_shop() -> void:
 	_transition_lock_timer = 0.2 # Reduced delay
 	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = SLOW_TIME_SCALE; target_time_scale = SLOW_TIME_SCALE
 	shop_hint_label.visible = true; shop_hint_label.text = "MOVE TO INITIATE"
+
+func _open_settings() -> void:
+	if is_settings_open or is_shop_open: return
+	is_settings_open = true; get_tree().paused = true
+	
+	var canvas = CanvasLayer.new(); canvas.name = "SettingsUI"; canvas.layer = 25; add_child(canvas)
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+	
+	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
+	
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
+	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
+	
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(500, 400); center.add_child(panel)
+	panel.pivot_offset = Vector2(250, 200)
+	
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
+	
+	var title = Label.new(); title.text = "/// SYSTEM_SETTINGS"; title.add_theme_font_size_override("font_size", 32); title.add_theme_color_override("font_color", tech_cyan * 2.0); vbox.add_child(title)
+	
+	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
+	
+	# Volume Slider
+	var vol_hbox = HBoxContainer.new(); vbox.add_child(vol_hbox)
+	var vol_label = Label.new(); vol_label.text = "AUDIO_OUTPUT: "; vol_hbox.add_child(vol_label)
+	var slider = HSlider.new(); slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL; slider.min_value = 0.0; slider.max_value = 1.0; slider.step = 0.05; vol_hbox.add_child(slider)
+	
+	if has_node("/root/AudioManager"):
+		slider.value = get_node("/root/AudioManager").get_volume()
+	
+	slider.value_changed.connect(func(val):
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").set_volume(val)
+	)
+	
+	vbox.add_spacer(false)
+	
+	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_style.border_width_left = 2; btn_style.border_color = tech_cyan * 0.5; btn_style.skew = Vector2(0.1, 0.0)
+	var btn_h = btn_style.duplicate(); btn_h.bg_color = tech_cyan * 0.2; btn_h.border_color = tech_cyan * 2.0
+	
+	var resume_btn = Button.new(); resume_btn.text = ">> RESUME_SESSION"; resume_btn.custom_minimum_size = Vector2(0, 50); resume_btn.add_theme_stylebox_override("normal", btn_style); resume_btn.add_theme_stylebox_override("hover", btn_h); resume_btn.pressed.connect(func(): _close_settings()); vbox.add_child(resume_btn)
+	
+	var quit_btn = Button.new(); quit_btn.text = ">> TERMINATE_APPLICATION"; quit_btn.custom_minimum_size = Vector2(0, 50); quit_btn.add_theme_stylebox_override("normal", btn_style); quit_btn.add_theme_stylebox_override("hover", btn_h); quit_btn.pressed.connect(func(): get_tree().quit()); vbox.add_child(quit_btn)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.15)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK)
+
+func _close_settings() -> void:
+	var settings = get_node_or_null("SettingsUI"); if settings: settings.queue_free()
+	is_settings_open = false; get_tree().paused = false; _last_real_ms = Time.get_ticks_msec()
 
 func _show_game_over_screen() -> void:
 	game_active = false; var go = CanvasLayer.new(); go.name = "GameOverUI"; go.layer = 30; add_child(go)
