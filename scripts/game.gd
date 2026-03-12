@@ -33,6 +33,7 @@ var shake_strength    : float = 0.0
 var _is_dying          : bool  = false
 var _death_grace_timer : float = 0.0
 const DEATH_GRACE_TIME : float = 0.4
+var _is_transitioning  : bool  = false
 
 # Shot Heat System
 var _shot_heat_multiplier : int = 0
@@ -134,12 +135,15 @@ func _clear_static_nodes() -> void:
 		for child in wall_visuals.get_children(): child.queue_free()
 
 func _start_level(level: int, open_shop: bool = true) -> void:
-	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true; Engine.time_scale = 0.0 
+	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = false; Engine.time_scale = 0.0 
+	_is_transitioning = false
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
 	for child in $UI.get_children():
-		if child is Label and (child == combo_label or child.name.begins_with("BonusLabel")): continue
-		if child is Label and child.text.contains("!"): child.queue_free()
+		if child is Label and (child.name.begins_with("BonusLabel") or child.text.contains("!") or child.text.contains("WIPEOUT")): 
+			child.queue_free()
+		elif child is Label and child == combo_label:
+			child.visible = false
 	if fade_overlay:
 		fade_overlay.color = Color.BLACK
 		var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(fade_overlay, "color:a", 0.0, 0.2)
@@ -180,6 +184,12 @@ func _process(delta: float) -> void:
 		else: shop_hint_label.text = "MOVE TO INITIATE"
 		return
 	if not game_active: return
+
+	# Ghost enemy safety check
+	if not _is_transitioning and get_tree().get_nodes_in_group("enemies").size() == 0:
+		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
+		return
+
 	total_time_elapsed += real_delta; time_remaining -= delta 
 	if _is_dying:
 		_death_grace_timer -= real_delta
@@ -198,12 +208,10 @@ func _process(delta: float) -> void:
 
 func set_player_active(active: bool) -> void:
 	if is_shop_open or _transition_lock_timer > 0.0: 
-		if active: _was_moving_on_load = true
 		return
 	if is_waiting_to_start:
-		if active and not _was_moving_on_load:
+		if active:
 			is_waiting_to_start = false; _last_real_ms = Time.get_ticks_msec(); shop_hint_label.visible = false
-		elif not active: _was_moving_on_load = false 
 	target_time_scale = NORMAL_TIME_SCALE if active else SLOW_TIME_SCALE
 
 func _handle_death() -> void:
@@ -224,6 +232,7 @@ func player_hit(amount: float = HIT_COST) -> void:
 	subtract_time(amount); trigger_screen_shake(0.3, 15.0); _pulse_zoom(BASE_ZOOM - 0.1, 20.0)
 
 func enemy_killed() -> void:
+	if not game_active: return
 	total_enemies_killed += 1; enemies_killed_in_level += 1
 	if _is_dying: _is_dying = false; time_remaining = 3.0
 	combo_count = mini(combo_count + 1, MAX_COMBO); combo_timer = COMBO_WINDOW; var reward = BASE_KILL_REWARD * combo_count; add_time(reward); _show_combo_popup(combo_count, reward); _pulse_zoom(1.02, 20.0)
@@ -231,7 +240,8 @@ func enemy_killed() -> void:
 		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 
 func _initiate_level_transition(delay: float) -> void:
-	game_active = false; Engine.time_scale = 1.0; _target_zoom = BASE_ZOOM + 0.3
+	if _is_transitioning: return
+	_is_transitioning = true; game_active = false; Engine.time_scale = 1.0; _target_zoom = BASE_ZOOM + 0.3
 	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_interval(delay)
 	tw.tween_callback(func():
 		if fade_overlay:
@@ -363,10 +373,17 @@ func _generate_inner_walls(level: int, w: float, h: float) -> Array:
 
 func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 	if not nav_region: return
-	var poly = NavigationPolygon.new(); var outline = PackedVector2Array([Vector2(20, 20), Vector2(w - 20, 20), Vector2(w - 20, h - 20), Vector2(20, h - 20)]); poly.add_outline(outline)
+	var poly = NavigationPolygon.new()
+	var outline = PackedVector2Array([Vector2(10, 10), Vector2(w - 10, 10), Vector2(w - 10, h - 10), Vector2(10, h - 10)])
+	poly.add_outline(outline)
 	for rect in inner_rects:
-		var r = rect.grow(10.0); var hole = PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]); poly.add_outline(hole)
-	poly.make_polygons_from_outlines(); nav_region.navigation_polygon = poly
+		var r = rect.grow(15.0)
+		var hole = PackedVector2Array([Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)])
+		poly.add_outline(hole)
+	
+	nav_region.navigation_polygon = poly
+	# NavigationServer2D sync for immediate use
+	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)
 
 func _get_random_pos(w: float, h: float, inner_rects: Array, safe_zone: Rect2) -> Vector2:
 	var best_p = Vector2(w/2.0 + 100.0, h/2.0 + 100.0)
@@ -386,7 +403,9 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 	var num_freezes = 1 if level < 10 else 2
 	for i in range(num_freezes):
 		var tf = time_freeze_scene.instantiate(); tf.global_position = _get_random_pos(w, h, inner_rects, safe_zone); dynamic_entities.add_child(tf)
-	var num_enemies = level; total_enemies_in_level = num_enemies; var types = ["melee", "ranged", "turret", "patrol"]
+	
+	var num_enemies = level; var types = ["melee", "ranged", "turret", "patrol"]
+	var spawned_count = 0
 	for i in range(num_enemies):
 		var e = enemy_scene.instantiate(); e.global_position = _get_random_pos(w, h, inner_rects, safe_zone)
 		if level <= 2: e.enemy_type = "melee"
@@ -398,6 +417,8 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 		elif e.enemy_type == "turret": e.shoot_cooldown = maxf(1.2, 3.0 - level * 0.1); e.aggro_range = 600.0 + level * 10.0
 		elif e.enemy_type == "patrol": e.move_speed = randf_range(80.0, 100.0 + level * 2.0)
 		dynamic_entities.add_child(e)
+		spawned_count += 1
+	total_enemies_in_level = spawned_count
 
 func _show_combo_popup(multiplier: int, reward: float) -> void:
 	if not combo_label: return
