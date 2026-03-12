@@ -135,8 +135,8 @@ func _clear_static_nodes() -> void:
 		for child in wall_visuals.get_children(): child.queue_free()
 
 func _start_level(level: int, open_shop: bool = true) -> void:
-	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = false; Engine.time_scale = 0.0 
-	_is_transitioning = false
+	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true; Engine.time_scale = 0.0 
+	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
 	
@@ -191,8 +191,9 @@ func _process(delta: float) -> void:
 		return
 	if not game_active: return
 
-	# Ghost enemy safety check - Only after level has started
+	# Ghost enemy safety check - Only after level has started and settled
 	if not _is_transitioning and total_enemies_in_level > 0:
+		# Add a small delay/buffer before checking group size to ensure nodes are in tree
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
 			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 			return
@@ -214,11 +215,14 @@ func _process(delta: float) -> void:
 	_update_ui()
 
 func set_player_active(active: bool) -> void:
-	if is_shop_open or _transition_lock_timer > 0.0: 
-		return
+	if is_shop_open: return
+	
 	if is_waiting_to_start:
-		if active:
+		if active and not _was_moving_on_load and _transition_lock_timer <= 0.0:
 			is_waiting_to_start = false; _last_real_ms = Time.get_ticks_msec(); shop_hint_label.visible = false
+		elif not active:
+			_was_moving_on_load = false 
+	
 	target_time_scale = NORMAL_TIME_SCALE if active else SLOW_TIME_SCALE
 
 func _handle_death() -> void:
