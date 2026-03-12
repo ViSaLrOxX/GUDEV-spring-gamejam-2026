@@ -139,11 +139,17 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	_is_transitioning = false
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
+	
+	# Explicitly clear UI layers
+	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
+	var go = get_node_or_null("GameOverUI"); if go: go.queue_free()
+	
 	for child in $UI.get_children():
-		if child is Label and (child.name.begins_with("BonusLabel") or child.text.contains("!") or child.text.contains("WIPEOUT")): 
-			child.queue_free()
-		elif child is Label and child == combo_label:
-			child.visible = false
+		if child is Label:
+			if child.name.begins_with("BonusLabel") or child.text.contains("!") or child.text.contains("WIPEOUT"): 
+				child.queue_free()
+			elif child == combo_label:
+				child.visible = false
 	if fade_overlay:
 		fade_overlay.color = Color.BLACK
 		var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(fade_overlay, "color:a", 0.0, 0.2)
@@ -307,7 +313,7 @@ func _close_shop() -> void:
 	is_waiting_to_start = false; shop_hint_label.visible = false; _last_real_ms = Time.get_ticks_msec()
 
 func _show_game_over_screen() -> void:
-	game_active = false; var go = CanvasLayer.new(); go.layer = 30; add_child(go)
+	game_active = false; var go = CanvasLayer.new(); go.name = "GameOverUI"; go.layer = 30; add_child(go)
 	var p = ColorRect.new(); p.size = Vector2(1280, 720); p.color = Color(0, 0, 0, 0.9); go.add_child(p)
 	var vbox = VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; vbox.size = Vector2(400, 500); vbox.position = Vector2(640 - 200, 360 - 250); go.add_child(vbox)
 	var t = Label.new(); t.text = "SYSTEM FAILURE"; t.add_theme_font_size_override("font_size", 48); t.add_theme_color_override("font_color", Color.RED * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t); vbox.add_child(HSeparator.new())
@@ -324,7 +330,10 @@ func portal_entered() -> void:
 
 func _show_big_bonus_message(txt: String) -> void:
 	var label = Label.new(); label.name = "BonusLabel_" + str(Time.get_ticks_msec()); label.text = txt; label.add_theme_font_size_override("font_size", 48); label.add_theme_color_override("font_color", Color.GOLD * 2.0); label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; label.size = Vector2(1280, 100); label.position = Vector2(0, 300); $UI.add_child(label)
-	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8); tw.finished.connect(func(): if is_instance_valid(label): label.queue_free())
+	# Bind tween to label node so it's killed if the label is freed
+	var tw = label.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8)
+	tw.finished.connect(label.queue_free)
 
 func _update_ui() -> void:
 	if time_bar:
