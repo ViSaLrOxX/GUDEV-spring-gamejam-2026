@@ -565,8 +565,10 @@ func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 		var hole = PackedVector2Array([Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)])
 		poly.add_outline(hole)
 	
+	# This generates the actual mesh data from the outlines
+	poly.make_polygons_from_outlines()
 	nav_region.navigation_polygon = poly
-	# NavigationServer2D sync for immediate use
+	# Force immediate sync
 	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)
 
 func _get_random_pos(w: float, h: float, inner_rects: Array, safe_zone: Rect2) -> Vector2:
