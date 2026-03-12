@@ -1,22 +1,35 @@
 extends Node
 
-# Dictionary to store preloaded sounds
-var sounds = {
-	"shoot": preload("res://assets/sound_effects/laserShoot.wav") if FileAccess.file_exists("res://assets/sound_effects/laserShoot.wav") else null,
-	"hit": preload("res://assets/sound_effects/hitHurt.wav") if FileAccess.file_exists("res://assets/sound_effects/hitHurt.wav") else null,
-	"explosion": null,
-	"pickup": preload("res://assets/sound_effects/laserShoot.wav") if FileAccess.file_exists("res://assets/sound_effects/laserShoot.wav") else null, # Fallback
-	"click": preload("res://assets/sound_effects/hitHurt.wav") if FileAccess.file_exists("res://assets/sound_effects/hitHurt.wav") else null # Fallback
-}
+# Use load() instead of preload() to prevent compile-time crashes if files are missing
+var sounds = {}
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_load_sounds()
+	_create_pool()
+
+func _load_sounds() -> void:
+	var sfx_path = "res://assets/sound_effects/"
+	var to_load = {
+		"shoot": "laserShoot.wav",
+		"hit": "hitHurt.wav",
+		"pickup": "laserShoot.wav", # Fallback
+		"click": "hitHurt.wav"      # Fallback
+	}
+	
+	for key in to_load:
+		var full_path = sfx_path + to_load[key]
+		if FileAccess.file_exists(full_path):
+			sounds[key] = load(full_path)
+		else:
+			print("[AudioManager] Missing asset: ", full_path)
+			sounds[key] = null
 
 var _pool_size = 16
 var _pool = []
 var _next_player = 0
 
-func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS # Play sounds even when game is paused
-	
-	# Create a pool of audio players
+func _create_pool() -> void:
 	for i in range(_pool_size):
 		var p = AudioStreamPlayer.new()
 		add_child(p)
