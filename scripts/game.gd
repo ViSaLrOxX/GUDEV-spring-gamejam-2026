@@ -103,24 +103,33 @@ func _setup_overscreen_hud() -> void:
 	
 	# Global Styles
 	var tech_cyan = Color(0.2, 0.8, 1.0)
-	var tech_bg = Color(0.02, 0.05, 0.08, 0.7)
+	var tech_bg = Color(0.01, 0.03, 0.05, 0.85) # Darker, more opaque
 	
 	var base_style = StyleBoxFlat.new()
 	base_style.bg_color = tech_bg
-	base_style.border_width_left = 2; base_style.border_width_top = 2
-	base_style.border_color = tech_cyan * 1.5
+	base_style.border_width_left = 3; base_style.border_width_top = 3
+	base_style.border_color = tech_cyan * 1.8 # Brighter border
 	base_style.skew = Vector2(0.1, 0.0)
-	base_style.corner_radius_top_left = 4
-	base_style.shadow_color = Color(0, 0, 0, 0.5)
-	base_style.shadow_size = 4
+	base_style.corner_radius_top_left = 2
+	
+	# Internal padding to fix text drift
+	base_style.content_margin_left = 25
+	base_style.content_margin_right = 25
+	base_style.content_margin_top = 12
+	base_style.content_margin_bottom = 12
+	
+	# Neon Glow Effect
+	base_style.shadow_color = tech_cyan * 0.4
+	base_style.shadow_size = 12
+	base_style.shadow_offset = Vector2(2, 2)
 
 	# 1. Corner Decals (Industrial Look)
-	var decal_color = tech_cyan * 0.8
+	var decal_color = tech_cyan * 0.6
 	for corner in [Control.PRESET_TOP_LEFT, Control.PRESET_TOP_RIGHT, Control.PRESET_BOTTOM_LEFT, Control.PRESET_BOTTOM_RIGHT]:
 		var c_box = Control.new(); c_box.set_anchors_and_offsets_preset(corner); root.add_child(c_box)
-		var h_line = ColorRect.new(); h_line.color = decal_color; h_line.custom_minimum_size = Vector2(60, 2); c_box.add_child(h_line)
-		var v_line = ColorRect.new(); v_line.color = decal_color; v_line.custom_minimum_size = Vector2(2, 60); c_box.add_child(v_line)
-		var dot = ColorRect.new(); dot.color = tech_cyan * 2.5; dot.custom_minimum_size = Vector2(6, 6); c_box.add_child(dot)
+		var h_line = ColorRect.new(); h_line.color = decal_color; h_line.custom_minimum_size = Vector2(80, 2); c_box.add_child(h_line)
+		var v_line = ColorRect.new(); v_line.color = decal_color; v_line.custom_minimum_size = Vector2(2, 80); c_box.add_child(v_line)
+		var dot = ColorRect.new(); dot.color = tech_cyan * 3.0; dot.custom_minimum_size = Vector2(8, 8); c_box.add_child(dot)
 		
 		if corner == Control.PRESET_TOP_LEFT: dot.position = Vector2(-3, -3)
 		elif corner == Control.PRESET_TOP_RIGHT: h_line.position = Vector2(-60, 0); dot.position = Vector2(-3, -3)
