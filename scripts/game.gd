@@ -3,7 +3,7 @@ extends Node2D
 const SLOW_TIME_SCALE  : float = 0.05
 const NORMAL_TIME_SCALE: float = 1.0
 const TIME_LERP_SPEED  : float = 15.0 # Adjusted for stable formula
-const STARTING_TIME    : float = 60.0
+const STARTING_TIME    : float = 30.0
 const BASE_SHOOT_COST  : float = 5.0 
 const HIT_COST         : float = 12.0
 const BASE_KILL_REWARD : float = 6.0
@@ -33,6 +33,9 @@ var shake_strength    : float = 0.0
 var _is_dying          : bool  = false
 var _death_grace_timer : float = 0.0
 const DEATH_GRACE_TIME : float = 0.4
+var _is_transitioning  : bool  = false
+var _transition_tween  : Tween = null
+var _ghost_check_timer : float = 0.0
 
 # Shot Heat System
 var _shot_heat_multiplier : int = 0
@@ -43,6 +46,7 @@ const HEAT_WINDOW_MS : int = 1000
 var inventory : Array = []
 var is_waiting_to_start : bool = true
 var is_shop_open : bool = false
+var is_settings_open : bool = false
 var _transition_lock_timer : float = 0.0
 const TRANSITION_DELAY : float = 0.8
 var _was_moving_on_load : bool = true
@@ -80,10 +84,15 @@ var dynamic_entities: Node2D = null
 var dynamic_walls: Node2D = null
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS # Script always runs
 	add_to_group("game")
-	dynamic_entities = Node2D.new(); add_child(dynamic_entities)
-	dynamic_walls = Node2D.new(); add_child(dynamic_walls)
-	_setup_screen_shader()
+	dynamic_entities = Node2D.new(); dynamic_entities.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_entities)
+	dynamic_walls = Node2D.new(); dynamic_walls.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_walls)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_music("music.mp3") # Ensure file is in assets/music/
+		
+	# _setup_screen_shader()
 	_setup_overscreen_hud()
 	_clear_static_nodes()
 	_start_level(1, false)
@@ -97,30 +106,96 @@ func _setup_overscreen_hud() -> void:
 	var ui = $UI
 	for child in ui.get_children(): child.queue_free()
 	var root = Control.new(); root.name = "HudRoot"; root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); ui.add_child(root)
-	var frame_color = Color(0.2, 0.8, 1.0, 0.6)
+	
+	# Global Styles
+	var tech_cyan = Color(0.2, 0.8, 1.0)
+	var tech_bg = Color(0.01, 0.03, 0.05, 0.85) # Darker, more opaque
+	
+	var base_style = StyleBoxFlat.new()
+	base_style.bg_color = tech_bg
+	base_style.border_width_left = 3; base_style.border_width_top = 3
+	base_style.border_color = tech_cyan * 1.8 # Brighter border
+	base_style.skew = Vector2(0.1, 0.0)
+	base_style.corner_radius_top_left = 2
+	
+	# Internal padding to fix text drift
+	base_style.content_margin_left = 25
+	base_style.content_margin_right = 25
+	base_style.content_margin_top = 12
+	base_style.content_margin_bottom = 12
+	
+	# Neon Glow Effect
+	base_style.shadow_color = tech_cyan * 0.4
+	base_style.shadow_size = 12
+	base_style.shadow_offset = Vector2(2, 2)
+
+	# 1. Corner Decals (Industrial Look)
+	var decal_color = tech_cyan * 0.6
 	for corner in [Control.PRESET_TOP_LEFT, Control.PRESET_TOP_RIGHT, Control.PRESET_BOTTOM_LEFT, Control.PRESET_BOTTOM_RIGHT]:
 		var c_box = Control.new(); c_box.set_anchors_and_offsets_preset(corner); root.add_child(c_box)
-		var h_line = ColorRect.new(); h_line.color = frame_color; h_line.custom_minimum_size = Vector2(120, 4); c_box.add_child(h_line)
-		var v_line = ColorRect.new(); v_line.color = frame_color; v_line.custom_minimum_size = Vector2(4, 120); c_box.add_child(v_line)
-		if corner == Control.PRESET_TOP_RIGHT: h_line.position = Vector2(-120, 0)
-		elif corner == Control.PRESET_BOTTOM_LEFT: v_line.position = Vector2(0, -120)
-		elif corner == Control.PRESET_BOTTOM_RIGHT: h_line.position = Vector2(-120, 0); v_line.position = Vector2(0, -120)
-	var bg_style = StyleBoxFlat.new(); bg_style.bg_color = Color(0, 0, 0, 0.9); bg_style.border_width_left = 2; bg_style.border_width_top = 2; bg_style.border_width_right = 2; bg_style.border_width_bottom = 2; bg_style.border_color = Color(0.3, 0.3, 0.5); bg_style.skew = Vector2(0.2, 0.0)
-	var fg_time = StyleBoxFlat.new(); fg_time.bg_color = Color(0.2, 1.0, 0.8) * 2.0; fg_time.skew = Vector2(0.2, 0.0)
-	var tl = VBoxContainer.new(); tl.position = Vector2(50, 50); tl.custom_minimum_size = Vector2(450, 0); root.add_child(tl)
-	time_bar = ProgressBar.new(); time_bar.custom_minimum_size = Vector2(450, 24); time_bar.show_percentage = false; time_bar.add_theme_stylebox_override("background", bg_style); time_bar.add_theme_stylebox_override("fill", fg_time); tl.add_child(time_bar)
-	inventory_label = Label.new(); inventory_label.add_theme_font_size_override("font_size", 20); inventory_label.add_theme_color_override("font_color", Color.WHITE * 2.0); tl.add_child(inventory_label)
-	var tr_box = VBoxContainer.new(); tr_box.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_box.offset_left = -450; tr_box.offset_top = 50; tr_box.offset_right = -50; tr_box.alignment = BoxContainer.ALIGNMENT_END; root.add_child(tr_box)
-	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 64); level_label.add_theme_color_override("font_color", Color.WHITE * 2.0); tr_box.add_child(level_label)
-	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 24); enemies_remaining_label.add_theme_color_override("font_color", Color.RED * 3.0); tr_box.add_child(enemies_remaining_label)
-	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(300, 16); progress_bar.show_percentage = false; progress_bar.add_theme_stylebox_override("background", bg_style); var fg_core = fg_time.duplicate(); fg_core.bg_color = Color(1.0, 0.4, 0.8) * 3.0; progress_bar.add_theme_stylebox_override("fill", fg_core); tr_box.add_child(progress_bar)
-	var bl = VBoxContainer.new(); bl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); bl.offset_left = 50; bl.offset_bottom = -50; bl.offset_top = -120; root.add_child(bl)
-	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(350, 16); cooldown_bar.show_percentage = false; cooldown_bar.add_theme_stylebox_override("background", bg_style); var fg_ammo = fg_time.duplicate(); fg_ammo.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("fill", fg_ammo); bl.add_child(cooldown_bar)
-	var br = VBoxContainer.new(); br.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br.offset_left = -450; br.offset_bottom = -50; br.offset_top = -150; br.offset_right = -50; br.alignment = BoxContainer.ALIGNMENT_END; root.add_child(br)
-	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 72); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); br.add_child(coins_bank_label)
-	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 80); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -180; root.add_child(combo_label)
-	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 48); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
-	fade_overlay = ColorRect.new(); fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); ui.add_child(fade_overlay)
+		var h_line = ColorRect.new(); h_line.color = decal_color; h_line.custom_minimum_size = Vector2(80, 2); c_box.add_child(h_line)
+		var v_line = ColorRect.new(); v_line.color = decal_color; v_line.custom_minimum_size = Vector2(2, 80); c_box.add_child(v_line)
+		var dot = ColorRect.new(); dot.color = tech_cyan * 3.0; dot.custom_minimum_size = Vector2(8, 8); c_box.add_child(dot)
+		
+		if corner == Control.PRESET_TOP_LEFT: dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_TOP_RIGHT: h_line.position = Vector2(-60, 0); dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_BOTTOM_LEFT: v_line.position = Vector2(0, -60); dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_BOTTOM_RIGHT: h_line.position = Vector2(-60, 0); v_line.position = Vector2(0, -60); dot.position = Vector2(-3, -3)
+
+	# 2. Time/System Panel (Top Left)
+	var tl_panel = PanelContainer.new(); tl_panel.position = Vector2(40, 40); tl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tl_panel)
+	var tl_vbox = VBoxContainer.new(); tl_vbox.custom_minimum_size = Vector2(400, 0); tl_vbox.add_theme_constant_override("separation", 5); tl_panel.add_child(tl_vbox)
+	
+	var time_header = Label.new(); time_header.text = "[ SYSTEM_STABILITY ]"; time_header.add_theme_font_size_override("font_size", 16); time_header.add_theme_color_override("font_outline_color", Color.BLACK); time_header.add_theme_constant_override("outline_size", 6); time_header.modulate = tech_cyan * 2.0; tl_vbox.add_child(time_header)
+	
+	time_bar = ProgressBar.new(); time_bar.custom_minimum_size = Vector2(0, 28); time_bar.show_percentage = false; tl_vbox.add_child(time_bar)
+	var bar_bg = base_style.duplicate(); bar_bg.bg_color = Color(0,0,0,0.4); bar_bg.border_width_left = 1; bar_bg.border_width_top = 1; bar_bg.border_width_right = 1; bar_bg.border_width_bottom = 1; bar_bg.border_color = tech_cyan * 0.4
+	var bar_fg = base_style.duplicate(); bar_fg.bg_color = tech_cyan * 2.0; bar_fg.border_width_left = 0; bar_fg.border_width_top = 0
+	time_bar.add_theme_stylebox_override("background", bar_bg); time_bar.add_theme_stylebox_override("fill", bar_fg)
+	
+	inventory_label = Label.new(); inventory_label.text = "NODES: NULL"; inventory_label.add_theme_font_size_override("font_size", 18); inventory_label.add_theme_color_override("font_outline_color", Color.BLACK); inventory_label.add_theme_constant_override("outline_size", 6); inventory_label.modulate = tech_cyan * 2.0; tl_vbox.add_child(inventory_label)
+
+	# 3. Threat/Round Panel (Top Right)
+	var tr_panel = PanelContainer.new(); tr_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_panel.offset_left = -440; tr_panel.offset_top = 40; tr_panel.offset_right = -40; tr_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tr_panel)
+	var tr_vbox = VBoxContainer.new(); tr_vbox.alignment = BoxContainer.ALIGNMENT_END; tr_panel.add_child(tr_vbox)
+	
+	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 72); level_label.add_theme_color_override("font_outline_color", Color.BLACK); level_label.add_theme_constant_override("outline_size", 10); level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(level_label)
+	
+	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 24); enemies_remaining_label.add_theme_color_override("font_outline_color", Color.BLACK); enemies_remaining_label.add_theme_constant_override("outline_size", 8); enemies_remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(enemies_remaining_label)
+	
+	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(300, 12); progress_bar.show_percentage = false; tr_vbox.add_child(progress_bar)
+	var core_fg = bar_fg.duplicate(); core_fg.bg_color = Color(1.0, 0.4, 0.8) * 3.0; progress_bar.add_theme_stylebox_override("background", bar_bg); progress_bar.add_theme_stylebox_override("fill", core_fg)
+
+	# 4. Weapons/Heat Panel (Bottom Left)
+	var bl_panel = PanelContainer.new(); bl_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); bl_panel.offset_left = 40; bl_panel.offset_bottom = -40; bl_panel.offset_top = -100; bl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(bl_panel)
+	var bl_vbox = VBoxContainer.new(); bl_vbox.custom_minimum_size = Vector2(300, 0); bl_panel.add_child(bl_vbox)
+	
+	var weapon_header = Label.new(); weapon_header.text = "[ PULSE_CAPACITOR ]"; weapon_header.add_theme_font_size_override("font_size", 16); weapon_header.add_theme_color_override("font_outline_color", Color.BLACK); weapon_header.add_theme_constant_override("outline_size", 6); weapon_header.modulate = tech_cyan * 2.0; bl_vbox.add_child(weapon_header)
+	
+	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(0, 14); cooldown_bar.show_percentage = false; bl_vbox.add_child(cooldown_bar)
+	var heat_fg = bar_fg.duplicate(); heat_fg.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("background", bar_bg); cooldown_bar.add_theme_stylebox_override("fill", heat_fg)
+
+	# 5. Economy Panel (Bottom Right)
+	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -320; br_panel.offset_bottom = -40; br_panel.offset_top = -120; br_panel.offset_right = -40; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
+	var br_hbox = HBoxContainer.new(); br_hbox.alignment = BoxContainer.ALIGNMENT_CENTER; br_hbox.add_theme_constant_override("separation", 15); br_panel.add_child(br_hbox)
+	
+	# Small glowing coin icon
+	var coin_icon = Panel.new(); coin_icon.custom_minimum_size = Vector2(40, 40); br_hbox.add_child(coin_icon)
+	var icon_style = StyleBoxFlat.new(); icon_style.bg_color = Color.GOLD * 2.5; icon_style.corner_radius_top_left = 20; icon_style.corner_radius_top_right = 20; icon_style.corner_radius_bottom_left = 20; icon_style.corner_radius_bottom_right = 20; icon_style.shadow_color = Color.GOLD * 0.5; icon_style.shadow_size = 8
+	coin_icon.add_theme_stylebox_override("panel", icon_style)
+	
+	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 64); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); coins_bank_label.add_theme_color_override("font_outline_color", Color.BLACK); coins_bank_label.add_theme_constant_override("outline_size", 12); br_hbox.add_child(coins_bank_label)
+
+	# Combo/Shop
+	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 96); combo_label.add_theme_color_override("font_outline_color", Color.BLACK); combo_label.add_theme_constant_override("outline_size", 16); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
+	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 42); shop_hint_label.add_theme_color_override("font_outline_color", Color.BLACK); shop_hint_label.add_theme_constant_override("outline_size", 8); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
+
+	# Dedicated Fade Layer (Ensures it's on top and doesn't block UI)
+	var fade_canvas = CanvasLayer.new(); fade_canvas.name = "FadeLayer"; fade_canvas.layer = 99; add_child(fade_canvas)
+	fade_overlay = ColorRect.new(); fade_overlay.name = "FadeOverlay"; fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE; fade_overlay.visible = true; fade_canvas.add_child(fade_overlay)
+
+	# Subtle Scanline Overlay
+	var scanline = ReferenceRect.new(); scanline.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); scanline.mouse_filter = Control.MOUSE_FILTER_IGNORE; scanline.border_color = Color(0.2, 0.8, 1.0, 0.05); scanline.border_width = 1.0; scanline.editor_only = false; root.add_child(scanline)
 
 func _clear_static_nodes() -> void:
 	for child in get_children():
@@ -134,22 +209,38 @@ func _clear_static_nodes() -> void:
 		for child in wall_visuals.get_children(): child.queue_free()
 
 func _start_level(level: int, open_shop: bool = true) -> void:
-	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true; Engine.time_scale = 0.0 
+	if _transition_tween: _transition_tween.kill(); _transition_tween = null
+
+	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true
+	# Keep time_scale at NORMAL so logic/UI works, we use SLOW once waiting starts
+	Engine.time_scale = 1.0 
+	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE; _ghost_check_timer = 2.0
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
+	
+	# Explicitly clear UI layers
+	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
+	var go = get_node_or_null("GameOverUI"); if go: go.queue_free()
+	
+	if player: 
+		player.process_mode = Node.PROCESS_MODE_PAUSABLE
+		player.move_speed = 130.0 * (1.0 + inventory.count("SPEED") * 0.15)
+		player.shoot_cooldown = 0.3 * (1.0 - inventory.count("COOL") * 0.15)
+
 	for child in $UI.get_children():
-		if child is Label and (child == combo_label or child.name.begins_with("BonusLabel")): continue
-		if child is Label and child.text.contains("!"): child.queue_free()
+		if child is Label:
+			if child.name.begins_with("BonusLabel") or child.text.contains("!") or child.text.contains("WIPEOUT"): 
+				child.queue_free()
+			elif child == combo_label:
+				child.visible = false
 	if fade_overlay:
 		fade_overlay.color = Color.BLACK
 		var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(fade_overlay, "color:a", 0.0, 0.2)
-	if player:
-		player.move_speed = 130.0 * (1.0 + inventory.count("SPEED") * 0.15)
-		player.shoot_cooldown = 0.3 * (1.0 - inventory.count("COOL") * 0.15)
-	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 5.0 + (inventory.count("TIME") * 10.0)
+	
+	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 2.0 + (inventory.count("TIME") * 10.0)
 	for child in dynamic_entities.get_children(): child.queue_free()
 	for child in dynamic_walls.get_children(): child.queue_free()
-	var map_w = 700.0 + (level - 1) * 60.0; var map_h = 500.0 + (level - 1) * 40.0
+	var map_w = 700.0 + (level - 1) * 20.0; var map_h = 500.0 + (level - 1) * 15.0
 	_rebuild_boundaries(map_w, map_h)
 	if player: player.global_position = Vector2(map_w / 2.0, map_h / 2.0)
 	var inner_rects = _generate_inner_walls(level, map_w, map_h)
@@ -158,6 +249,11 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	if open_shop: _open_shop()
 
 func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"):
+		if is_settings_open: _close_settings()
+		elif not is_shop_open: _open_settings()
+		return
+
 	if is_waiting_to_start and event.is_action_pressed("shop") and _transition_lock_timer <= 0.0:
 		if not is_shop_open: _open_shop()
 		else: _close_shop()
@@ -175,11 +271,26 @@ func _process(delta: float) -> void:
 			if shake_duration <= 0.0: camera.offset = Vector2.ZERO
 
 	if is_shop_open: return
+	
 	if is_waiting_to_start:
 		if _transition_lock_timer > 0.0: _transition_lock_timer -= real_delta; shop_hint_label.text = "SYNCING..."
 		else: shop_hint_label.text = "MOVE TO INITIATE"
+		# Must stay at SLOW (0.05) NOT 0.0, otherwise player scripts stop running
+		Engine.time_scale = SLOW_TIME_SCALE
 		return
-	if not game_active: return
+
+	if not game_active:
+		if _is_transitioning: Engine.time_scale = 1.0
+		return
+
+	# Ghost enemy safety check - Only after level has started and settled
+	_ghost_check_timer -= real_delta
+	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
+		# Add a small delay/buffer before checking group size to ensure nodes are in tree
+		if get_tree().get_nodes_in_group("enemies").size() == 0:
+			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
+			return
+
 	total_time_elapsed += real_delta; time_remaining -= delta 
 	if _is_dying:
 		_death_grace_timer -= real_delta
@@ -189,7 +300,8 @@ func _process(delta: float) -> void:
 	
 	# Stable frame-independent time scale lerp
 	var ts_weight = 1.0 - exp(-TIME_LERP_SPEED * real_delta)
-	Engine.time_scale = lerp(Engine.time_scale, target_time_scale, ts_weight)
+	var next_ts = lerp(Engine.time_scale, target_time_scale, ts_weight)
+	Engine.time_scale = clampf(next_ts, 0.0, 1.0)
 	
 	if combo_count > 0:
 		combo_timer -= real_delta
@@ -197,13 +309,14 @@ func _process(delta: float) -> void:
 	_update_ui()
 
 func set_player_active(active: bool) -> void:
-	if is_shop_open or _transition_lock_timer > 0.0: 
-		if active: _was_moving_on_load = true
-		return
+	if is_shop_open: return
+	
 	if is_waiting_to_start:
-		if active and not _was_moving_on_load:
+		if active and not _was_moving_on_load and _transition_lock_timer <= 0.0:
 			is_waiting_to_start = false; _last_real_ms = Time.get_ticks_msec(); shop_hint_label.visible = false
-		elif not active: _was_moving_on_load = false 
+		elif not active:
+			_was_moving_on_load = false 
+	
 	target_time_scale = NORMAL_TIME_SCALE if active else SLOW_TIME_SCALE
 
 func _handle_death() -> void:
@@ -221,21 +334,34 @@ func player_shoot(lethal: bool = false) -> void:
 	_pulse_zoom(BASE_ZOOM + 0.05, 40.0) 
 
 func player_hit(amount: float = HIT_COST) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("hit")
 	subtract_time(amount); trigger_screen_shake(0.3, 15.0); _pulse_zoom(BASE_ZOOM - 0.1, 20.0)
 
 func enemy_killed() -> void:
+	if not game_active: return
 	total_enemies_killed += 1; enemies_killed_in_level += 1
 	if _is_dying: _is_dying = false; time_remaining = 3.0
 	combo_count = mini(combo_count + 1, MAX_COMBO); combo_timer = COMBO_WINDOW; var reward = BASE_KILL_REWARD * combo_count; add_time(reward); _show_combo_popup(combo_count, reward); _pulse_zoom(1.02, 20.0)
+	
 	if enemies_killed_in_level >= total_enemies_in_level:
+		if has_node("/root/AudioManager"): 
+			get_node("/root/AudioManager").play_sfx("explosion")
 		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 
 func _initiate_level_transition(delay: float) -> void:
-	game_active = false; Engine.time_scale = 1.0; _target_zoom = BASE_ZOOM + 0.3
-	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_interval(delay)
-	tw.tween_callback(func():
-		if fade_overlay:
-			var ftw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); ftw.tween_property(fade_overlay, "color:a", 1.0, 0.2); ftw.finished.connect(func(): _start_level(current_level + 1))
+	if _is_transitioning: return
+	_is_transitioning = true; game_active = false; Engine.time_scale = 1.0; _target_zoom = BASE_ZOOM + 0.3
+	
+	_transition_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_transition_tween.tween_interval(delay)
+	_transition_tween.tween_callback(func():
+		if is_instance_valid(fade_overlay):
+			var ftw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			ftw.tween_property(fade_overlay, "color:a", 1.0, 0.2)
+			ftw.finished.connect(func(): _start_level(current_level + 1))
+		else:
+			_start_level(current_level + 1)
 	)
 
 func _pulse_zoom(amt: float, speed: float) -> void:
@@ -271,35 +397,195 @@ func _trigger_game_over() -> void:
 	game_active = false; Engine.time_scale = 1.0; _show_game_over_screen()
 
 func _open_shop() -> void:
-	is_shop_open = true; var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
-	var br_rect = ColorRect.new(); br_rect.size = Vector2(1280, 720); br_rect.color = Color(0, 0, 0, 0.95); canvas.add_child(br_rect)
-	var vbox = VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; vbox.size = Vector2(800, 600); vbox.position = Vector2(640 - 400, 360 - 300); vbox.add_theme_constant_override("separation", 20); canvas.add_child(vbox)
-	var title = Label.new(); title.text = "UPGRADE TERMINAL // ROUND " + str(current_level); title.add_theme_font_size_override("font_size", 48); title.add_theme_color_override("font_color", Color.CYAN * 2.0); title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(title)
-	var max_slots = int(1 + floor(current_level / 10.0)); var info = Label.new(); info.text = "SLOTS USED: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; info.add_theme_font_size_override("font_size", 24); info.add_theme_color_override("font_color", Color.GOLD * 2.0); info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(info)
-	var items = [["EXTRA LIFE", 500, "LIFE"], ["COOLING OVERCLOCK", 350, "COOL"], ["CHRONO-STABILITY", 250, "TIME"], ["SERVO TUNING", 300, "SPEED"]]
+	if is_shop_open: return
+	is_shop_open = true; get_tree().paused = true
+	
+	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+	
+	# CenterContainer is the most robust way to center things in Godot 4
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
+	
+	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
+	
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(850, 600); center.add_child(panel)
+	panel.pivot_offset = Vector2(425, 300)
+	
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
+
+	# Header
+	var title = Label.new(); title.text = "/// UPGRADE_TERMINAL_V4.6"; title.add_theme_font_size_override("font_size", 42); title.add_theme_color_override("font_color", tech_cyan * 2.0); title.add_theme_color_override("font_outline_color", Color.BLACK); title.add_theme_constant_override("outline_size", 8); vbox.add_child(title)
+	
+	var max_slots = int(1 + floor(current_level / 10.0))
+	var info = Label.new(); info.text = "STORAGE: %d/%d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; info.add_theme_font_size_override("font_size", 22); info.modulate = tech_cyan * 0.8; vbox.add_child(info)
+	
+	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
+
+	# Item Grid
+	var grid = GridContainer.new(); grid.columns = 2; grid.add_theme_constant_override("h_separation", 20); grid.add_theme_constant_override("v_separation", 20); vbox.add_child(grid)
+	
+	var items = [
+		["EXTRA LIFE", 500, "LIFE", "RESTORE SYSTEM ON FAILURE"],
+		["OVERCLOCK", 350, "COOL", "REDUCE WEAPON COOLDOWN"],
+		["CHRONO-STAB", 250, "TIME", "EXTEND MISSION DURATION"],
+		["SERVO-TUNE", 300, "SPEED", "INCREASE CHASSIS VELOCITY"]
+	]
+	
+	var btn_normal = StyleBoxFlat.new(); btn_normal.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_normal.border_width_left = 2; btn_normal.border_color = tech_cyan * 0.5; btn_normal.skew = Vector2(0.1, 0.0)
+	var btn_hover = btn_normal.duplicate(); btn_hover.bg_color = tech_cyan * 0.2; btn_hover.border_color = tech_cyan * 2.0
+	
 	for item in items:
-		var b = Button.new(); b.text = "%s: %d Credits" % [item[0], item[1]]; b.custom_minimum_size = Vector2(450, 60); b.pressed.connect(func(): _buy_upgrade(item[2], item[1], info, max_slots)); vbox.add_child(b)
-	var close_btn = Button.new(); close_btn.text = "INITIATE NEXT ROUND"; close_btn.pressed.connect(func(): _close_shop()); vbox.add_child(close_btn)
+		var item_vbox = VBoxContainer.new(); grid.add_child(item_vbox)
+		var b = Button.new(); b.text = "%s [%d]" % [item[0], item[1]]; b.custom_minimum_size = Vector2(380, 70); b.add_theme_stylebox_override("normal", btn_normal); b.add_theme_stylebox_override("hover", btn_hover); b.pressed.connect(func(): 
+			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+			_buy_upgrade(item[2], item[1], info, max_slots)
+		); item_vbox.add_child(b)
+		var desc = Label.new(); desc.text = item[3]; desc.add_theme_font_size_override("font_size", 14); desc.modulate = Color.GRAY; item_vbox.add_child(desc)
+
+	vbox.add_spacer(false)
+	var close_btn = Button.new(); close_btn.text = ">> INITIATE_NEXT_SEQUENCE"; close_btn.custom_minimum_size = Vector2(0, 60); close_btn.add_theme_stylebox_override("normal", btn_normal); close_btn.add_theme_stylebox_override("hover", btn_hover); close_btn.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		_close_shop()
+	); vbox.add_child(close_btn)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _buy_upgrade(type: String, cost: int, info_label: Label, max_slots: int) -> void:
 	if inventory.size() >= max_slots: _show_big_bonus_message("SLOTS FULL!"); return
 	if total_coins_collected >= cost:
-		total_coins_collected -= cost; inventory.append(type); _update_ui(); info_label.text = "SLOTS USED: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; _show_big_bonus_message("ACQUIRED: " + type)
+		total_coins_collected -= cost; inventory.append(type); _update_ui(); info_label.text = "STORAGE: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; _show_big_bonus_message("ACQUIRED: " + type)
 	else: _show_big_bonus_message("INSUFFICIENT CREDITS")
 
 func _close_shop() -> void:
-	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free(); is_shop_open = false; _transition_lock_timer = TRANSITION_DELAY
+	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
+	is_shop_open = false; get_tree().paused = false; _last_real_ms = Time.get_ticks_msec()
+	_transition_lock_timer = 0.2 # Reduced delay
+	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = SLOW_TIME_SCALE; target_time_scale = SLOW_TIME_SCALE
+	shop_hint_label.visible = true; shop_hint_label.text = "MOVE TO INITIATE"
+
+func _open_settings() -> void:
+	if is_settings_open or is_shop_open: return
+	is_settings_open = true; get_tree().paused = true
+	
+	var canvas = CanvasLayer.new(); canvas.name = "SettingsUI"; canvas.layer = 25; add_child(canvas)
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
+	
+	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
+	
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
+	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
+	
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(700, 550); center.add_child(panel)
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.02, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	p_style.content_margin_left = 30; p_style.content_margin_right = 30; p_style.content_margin_top = 30; p_style.content_margin_bottom = 30
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var main_vbox = VBoxContainer.new(); main_vbox.add_theme_constant_override("separation", 15); panel.add_child(main_vbox)
+	
+	var title = Label.new(); title.text = "/// SYSTEM_SETTINGS_V4.6"; title.add_theme_font_size_override("font_size", 32); title.add_theme_color_override("font_color", tech_cyan * 2.0); main_vbox.add_child(title)
+	
+	# Tab Logic
+	var tab_container = TabContainer.new(); tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL; main_vbox.add_child(tab_container)
+	var t_style = StyleBoxFlat.new(); t_style.bg_color = Color(0,0,0,0); t_style.border_width_bottom = 2; t_style.border_color = tech_cyan
+	tab_container.add_theme_stylebox_override("panel", t_style)
+
+	# 1. BASIC TAB
+	var basic_vbox = VBoxContainer.new(); basic_vbox.name = "PRIMARY_AUDIO"; basic_vbox.add_theme_constant_override("separation", 20); tab_container.add_child(basic_vbox)
+	basic_vbox.add_child(Control.new()) # Spacer
+	
+	_add_vol_slider(basic_vbox, "MASTER_LINK", func(v): AudioManager.set_master_volume(v), AudioManager.get_master_volume())
+	_add_vol_slider(basic_vbox, "MUSIC_STREAM", func(v): AudioManager.set_music_volume(v), AudioManager.get_music_volume())
+
+	# 2. ADVANCED TAB
+	var adv_vbox = ScrollContainer.new(); adv_vbox.name = "SUB_SYSTEMS"; tab_container.add_child(adv_vbox)
+	var adv_list = VBoxContainer.new(); adv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL; adv_vbox.add_child(adv_list)
+	adv_list.add_child(Control.new())
+	
+	var sfx_keys = ["shoot", "hit", "pickup", "click", "explosion"]
+	for sfx in sfx_keys:
+		_add_vol_slider(adv_list, sfx.to_upper() + "_LEVEL", func(v): AudioManager.set_sfx_volume(sfx, v), AudioManager.get_sfx_volume(sfx))
+
+	# Footer Buttons
+	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_style.border_width_left = 2; btn_style.border_color = tech_cyan * 0.5; btn_style.skew = Vector2(0.1, 0.0)
+	var btn_h = btn_style.duplicate(); btn_h.bg_color = tech_cyan * 0.2; btn_h.border_color = tech_cyan * 2.0
+	
+	var footer_hbox = HBoxContainer.new(); footer_hbox.add_theme_constant_override("separation", 20); main_vbox.add_child(footer_hbox)
+	
+	var resume_btn = Button.new(); resume_btn.text = ">> RESUME"; resume_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL; resume_btn.custom_minimum_size = Vector2(0, 50); resume_btn.add_theme_stylebox_override("normal", btn_style); resume_btn.add_theme_stylebox_override("hover", btn_h); resume_btn.pressed.connect(func(): _close_settings()); footer_hbox.add_child(resume_btn)
+	
+	var quit_btn = Button.new(); quit_btn.text = ">> TERMINATE"; quit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL; quit_btn.custom_minimum_size = Vector2(0, 50); quit_btn.add_theme_stylebox_override("normal", btn_style); quit_btn.add_theme_stylebox_override("hover", btn_h); quit_btn.pressed.connect(func(): get_tree().quit()); footer_hbox.add_child(quit_btn)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.15)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK)
+
+func _add_vol_slider(parent: Node, label_text: String, callback: Callable, initial_val: float) -> void:
+	var hbox = HBoxContainer.new(); parent.add_child(hbox)
+	var l = Label.new(); l.text = label_text + ": "; l.custom_minimum_size = Vector2(180, 0); hbox.add_child(l)
+	var s = HSlider.new(); s.size_flags_horizontal = Control.SIZE_EXPAND_FILL; s.min_value = 0.0; s.max_value = 1.0; s.step = 0.05; s.value = initial_val; hbox.add_child(s)
+	s.value_changed.connect(callback)
+
+func _close_settings() -> void:
+	var settings = get_node_or_null("SettingsUI"); if settings: settings.queue_free()
+	is_settings_open = false; get_tree().paused = false; _last_real_ms = Time.get_ticks_msec()
 
 func _show_game_over_screen() -> void:
-	game_active = false; var go = CanvasLayer.new(); go.layer = 30; add_child(go)
-	var p = ColorRect.new(); p.size = Vector2(1280, 720); p.color = Color(0, 0, 0, 0.9); go.add_child(p)
-	var vbox = VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; vbox.size = Vector2(400, 500); vbox.position = Vector2(640 - 200, 360 - 250); go.add_child(vbox)
-	var t = Label.new(); t.text = "SYSTEM FAILURE"; t.add_theme_font_size_override("font_size", 48); t.add_theme_color_override("font_color", Color.RED * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t); vbox.add_child(HSeparator.new())
+	game_active = false; var go = CanvasLayer.new(); go.name = "GameOverUI"; go.layer = 30; add_child(go)
+	
+	var alert_red = Color(1.0, 0.2, 0.2)
+	var tech_bg = Color(0.05, 0.01, 0.01, 0.95)
+	
+	var p = ColorRect.new(); p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.color = Color(0.1, 0, 0, 0.7); go.add_child(p)
+	
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); go.add_child(center)
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(600, 550); panel.pivot_offset = Vector2(300, 275); center.add_child(panel)
+	
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = alert_red; p_style.skew = Vector2(-0.05, 0.0); p_style.shadow_color = alert_red * 0.3; p_style.shadow_size = 25
+	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 20); panel.add_child(vbox)
+
+	var t = Label.new(); t.text = "CRITICAL_SYSTEM_FAILURE"; t.add_theme_font_size_override("font_size", 42); t.add_theme_color_override("font_color", alert_red * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t)
+	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
+	
+	var stats_vbox = VBoxContainer.new(); stats_vbox.add_theme_constant_override("separation", 10); vbox.add_child(stats_vbox)
 	var s = [["ROUND REACHED", current_level], ["ELIMINATIONS", total_enemies_killed], ["CREDITS EARNED", total_coins_collected], ["TIME SURVIVED", "%.1fs" % total_time_elapsed]]
 	for stat in s:
-		var l = Label.new(); l.text = "%s: %s" % [stat[0], str(stat[1])]; l.add_theme_font_size_override("font_size", 24); l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(l)
-	var rb = Button.new(); rb.text = "RESTART SYSTEM"; rb.custom_minimum_size = Vector2(200, 50); rb.pressed.connect(func(): get_tree().reload_current_scene()); vbox.add_child(rb)
-	var mb = Button.new(); mb.text = "EXIT TO MAIN MENU"; mb.custom_minimum_size = Vector2(200, 50); mb.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu.tscn")); vbox.add_child(mb)
+		var hbox = HBoxContainer.new(); stats_vbox.add_child(hbox)
+		var l_stat = Label.new(); l_stat.text = stat[0]; l_stat.modulate = Color.GRAY; hbox.add_child(l_stat)
+		var spacer = Control.new(); spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hbox.add_child(spacer)
+		var r_stat = Label.new(); r_stat.text = str(stat[1]); r_stat.add_theme_color_override("font_color", alert_red); hbox.add_child(r_stat)
+
+	vbox.add_spacer(false)
+	
+	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.2, 0.05, 0.05, 0.5); btn_style.border_width_left = 2; btn_style.border_color = alert_red * 0.5; btn_style.skew = Vector2(-0.1, 0.0)
+	var btn_h = btn_style.duplicate(); btn_h.bg_color = alert_red * 0.2; btn_h.border_color = alert_red * 2.0
+	
+	var rb = Button.new(); rb.text = "REBOOT_SYSTEM"; rb.custom_minimum_size = Vector2(0, 50); rb.add_theme_stylebox_override("normal", btn_style); rb.add_theme_stylebox_override("hover", btn_h); rb.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		get_tree().reload_current_scene()
+	); vbox.add_child(rb)
+	var mb = Button.new(); mb.text = "TERMINAL_EXIT"; mb.custom_minimum_size = Vector2(0, 50); mb.add_theme_stylebox_override("normal", btn_style); mb.add_theme_stylebox_override("hover", btn_h); mb.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		get_tree().change_scene_to_file("res://scenes/menu.tscn")
+	); vbox.add_child(mb)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(1.1, 1.1)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 
 func portal_entered() -> void:
 	if portal_unlocked:
@@ -308,7 +594,10 @@ func portal_entered() -> void:
 
 func _show_big_bonus_message(txt: String) -> void:
 	var label = Label.new(); label.name = "BonusLabel_" + str(Time.get_ticks_msec()); label.text = txt; label.add_theme_font_size_override("font_size", 48); label.add_theme_color_override("font_color", Color.GOLD * 2.0); label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; label.size = Vector2(1280, 100); label.position = Vector2(0, 300); $UI.add_child(label)
-	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8); tw.finished.connect(func(): label.queue_free())
+	# Bind tween to label node so it's killed if the label is freed
+	var tw = label.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8)
+	tw.finished.connect(label.queue_free)
 
 func _update_ui() -> void:
 	if time_bar:
@@ -322,7 +611,7 @@ func _update_ui() -> void:
 	if level_label: level_label.text = "ROUND %02d" % current_level
 	if enemies_remaining_label: enemies_remaining_label.text = "THREATS: %d / %d" % [total_enemies_in_level - enemies_killed_in_level, total_enemies_in_level]
 	if coins_bank_label: coins_bank_label.text = "%04d" % total_coins_collected
-	if inventory_label: inventory_label.text = "SLOTS: %d / %d" % [inventory.size(), int(1 + floor(current_level / 10.0))]
+	if inventory_label: inventory_label.text = "STORAGE: %d / %d" % [inventory.size(), int(1 + floor(current_level / 10.0))]
 	if shop_hint_label: shop_hint_label.visible = is_waiting_to_start and not is_shop_open
 	if combo_label: combo_label.visible = combo_count > 1; combo_label.text = "COMBO ×%d" % combo_count
 
@@ -363,18 +652,37 @@ func _generate_inner_walls(level: int, w: float, h: float) -> Array:
 
 func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 	if not nav_region: return
-	var poly = NavigationPolygon.new(); var outline = PackedVector2Array([Vector2(20, 20), Vector2(w - 20, 20), Vector2(w - 20, h - 20), Vector2(20, h - 20)]); poly.add_outline(outline)
+	var poly = NavigationPolygon.new()
+	var outline = PackedVector2Array([Vector2(10, 10), Vector2(w - 10, 10), Vector2(w - 10, h - 10), Vector2(10, h - 10)])
+	poly.add_outline(outline)
 	for rect in inner_rects:
-		var r = rect.grow(10.0); var hole = PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]); poly.add_outline(hole)
-	poly.make_polygons_from_outlines(); nav_region.navigation_polygon = poly
+		var r = rect.grow(15.0)
+		var hole = PackedVector2Array([Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)])
+		poly.add_outline(hole)
+	
+	# Modern baking approach: avoids deprecated make_polygons_from_outlines
+	# We use the NavigationServer to bake the source outlines into valid polygons
+	var source_geometry = NavigationMeshSourceGeometryData2D.new()
+	NavigationServer2D.parse_source_geometry_data(poly, source_geometry, nav_region)
+	NavigationServer2D.bake_from_source_geometry_data(poly, source_geometry)
+	
+	nav_region.navigation_polygon = poly
+	# Force immediate sync
+	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)
 
 func _get_random_pos(w: float, h: float, inner_rects: Array, safe_zone: Rect2) -> Vector2:
-	var best_p = Vector2(w/2.0 + 100.0, h/2.0 + 100.0)
-	for i in range(100):
+	for i in range(250): # Increased attempts
 		var p = Vector2(randf_range(80, w - 80), randf_range(80, h - 80)); if safe_zone.has_point(p): continue
-		var valid = true; for r in inner_rects: if r.grow(45.0).has_point(p): valid = false; break
+		var valid = true; for r in inner_rects: if r.grow(50.0).has_point(p): valid = false; break
 		if valid: return p
-	return best_p
+	
+	# Fallback: ignore safe zone if desperate
+	for i in range(50):
+		var p = Vector2(randf_range(50, w - 50), randf_range(50, h - 50))
+		var valid = true; for r in inner_rects: if r.grow(30.0).has_point(p): valid = false; break
+		if valid: return p
+
+	return Vector2(w/2.0, h/2.0) + Vector2(randf_range(-50, 50), randf_range(-50, 50))
 
 func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void:
 	var sz = minf(w, h) * 0.25; var safe_zone = Rect2(w/2.0 - sz, h/2.0 - sz, sz * 2.0, sz * 2.0); portal_instance = portal_scene.instantiate(); portal_instance.global_position = _get_random_pos(w, h, inner_rects, safe_zone); dynamic_entities.add_child(portal_instance)
@@ -386,7 +694,9 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 	var num_freezes = 1 if level < 10 else 2
 	for i in range(num_freezes):
 		var tf = time_freeze_scene.instantiate(); tf.global_position = _get_random_pos(w, h, inner_rects, safe_zone); dynamic_entities.add_child(tf)
-	var num_enemies = level; total_enemies_in_level = num_enemies; var types = ["melee", "ranged", "turret", "patrol"]
+	
+	var num_enemies = level * 2; var types = ["melee", "ranged", "turret", "patrol"]
+	var spawned_count = 0
 	for i in range(num_enemies):
 		var e = enemy_scene.instantiate(); e.global_position = _get_random_pos(w, h, inner_rects, safe_zone)
 		if level <= 2: e.enemy_type = "melee"
@@ -398,6 +708,8 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 		elif e.enemy_type == "turret": e.shoot_cooldown = maxf(1.2, 3.0 - level * 0.1); e.aggro_range = 600.0 + level * 10.0
 		elif e.enemy_type == "patrol": e.move_speed = randf_range(80.0, 100.0 + level * 2.0)
 		dynamic_entities.add_child(e)
+		spawned_count += 1
+	total_enemies_in_level = spawned_count
 
 func _show_combo_popup(multiplier: int, reward: float) -> void:
 	if not combo_label: return

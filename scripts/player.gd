@@ -34,6 +34,11 @@ func _physics_process(delta: float) -> void:
 	if not _game:
 		_game = get_tree().get_first_node_in_group("game")
 	
+	if _game and not _game.game_active:
+		velocity = Vector2.ZERO
+		move_and_slide()
+		return
+	
 	var dir := _get_input_direction()
 	_is_moving = dir.length_squared() > 0.01
 
@@ -100,6 +105,10 @@ func _shoot() -> void:
 	bullet.rotation        = global_rotation
 	if bullet.has_method("launch"):
 		bullet.launch(shoot_dir * bullet_speed)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("shoot")
+		
 	if _game:
 		_game.player_shoot(is_lethal)
 
