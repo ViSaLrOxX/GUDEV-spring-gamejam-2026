@@ -483,45 +483,57 @@ func _open_settings() -> void:
 	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
 	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
 	
-	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(500, 400); center.add_child(panel)
-	panel.pivot_offset = Vector2(250, 200)
-	
-	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
-	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(700, 550); center.add_child(panel)
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.02, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	p_style.content_margin_left = 30; p_style.content_margin_right = 30; p_style.content_margin_top = 30; p_style.content_margin_bottom = 30
 	panel.add_theme_stylebox_override("panel", p_style)
 	
-	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
+	var main_vbox = VBoxContainer.new(); main_vbox.add_theme_constant_override("separation", 15); panel.add_child(main_vbox)
 	
-	var title = Label.new(); title.text = "/// SYSTEM_SETTINGS"; title.add_theme_font_size_override("font_size", 32); title.add_theme_color_override("font_color", tech_cyan * 2.0); vbox.add_child(title)
+	var title = Label.new(); title.text = "/// SYSTEM_SETTINGS_V4.6"; title.add_theme_font_size_override("font_size", 32); title.add_theme_color_override("font_color", tech_cyan * 2.0); main_vbox.add_child(title)
 	
-	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
+	# Tab Logic
+	var tab_container = TabContainer.new(); tab_container.size_flags_vertical = Control.SIZE_EXPAND_FILL; main_vbox.add_child(tab_container)
+	var t_style = StyleBoxFlat.new(); t_style.bg_color = Color(0,0,0,0); t_style.border_width_bottom = 2; t_style.border_color = tech_cyan
+	tab_container.add_theme_stylebox_override("panel", t_style)
+
+	# 1. BASIC TAB
+	var basic_vbox = VBoxContainer.new(); basic_vbox.name = "PRIMARY_AUDIO"; basic_vbox.add_theme_constant_override("separation", 20); tab_container.add_child(basic_vbox)
+	basic_vbox.add_child(Control.new()) # Spacer
 	
-	# Volume Slider
-	var vol_hbox = HBoxContainer.new(); vbox.add_child(vol_hbox)
-	var vol_label = Label.new(); vol_label.text = "AUDIO_OUTPUT: "; vol_hbox.add_child(vol_label)
-	var slider = HSlider.new(); slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL; slider.min_value = 0.0; slider.max_value = 1.0; slider.step = 0.05; vol_hbox.add_child(slider)
+	_add_vol_slider(basic_vbox, "MASTER_LINK", func(v): AudioManager.set_master_volume(v), AudioManager.get_master_volume())
+	_add_vol_slider(basic_vbox, "MUSIC_STREAM", func(v): AudioManager.set_music_volume(v), AudioManager.get_music_volume())
+
+	# 2. ADVANCED TAB
+	var adv_vbox = ScrollContainer.new(); adv_vbox.name = "SUB_SYSTEMS"; tab_container.add_child(adv_vbox)
+	var adv_list = VBoxContainer.new(); adv_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL; adv_vbox.add_child(adv_list)
+	adv_list.add_child(Control.new())
 	
-	if has_node("/root/AudioManager"):
-		slider.value = get_node("/root/AudioManager").get_volume()
-	
-	slider.value_changed.connect(func(val):
-		if has_node("/root/AudioManager"): get_node("/root/AudioManager").set_volume(val)
-	)
-	
-	vbox.add_spacer(false)
-	
+	var sfx_keys = ["shoot", "hit", "pickup", "click", "explosion"]
+	for sfx in sfx_keys:
+		_add_vol_slider(adv_list, sfx.to_upper() + "_LEVEL", func(v): AudioManager.set_sfx_volume(sfx, v), AudioManager.get_sfx_volume(sfx))
+
+	# Footer Buttons
 	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_style.border_width_left = 2; btn_style.border_color = tech_cyan * 0.5; btn_style.skew = Vector2(0.1, 0.0)
 	var btn_h = btn_style.duplicate(); btn_h.bg_color = tech_cyan * 0.2; btn_h.border_color = tech_cyan * 2.0
 	
-	var resume_btn = Button.new(); resume_btn.text = ">> RESUME_SESSION"; resume_btn.custom_minimum_size = Vector2(0, 50); resume_btn.add_theme_stylebox_override("normal", btn_style); resume_btn.add_theme_stylebox_override("hover", btn_h); resume_btn.pressed.connect(func(): _close_settings()); vbox.add_child(resume_btn)
+	var footer_hbox = HBoxContainer.new(); footer_hbox.add_theme_constant_override("separation", 20); main_vbox.add_child(footer_hbox)
 	
-	var quit_btn = Button.new(); quit_btn.text = ">> TERMINATE_APPLICATION"; quit_btn.custom_minimum_size = Vector2(0, 50); quit_btn.add_theme_stylebox_override("normal", btn_style); quit_btn.add_theme_stylebox_override("hover", btn_h); quit_btn.pressed.connect(func(): get_tree().quit()); vbox.add_child(quit_btn)
+	var resume_btn = Button.new(); resume_btn.text = ">> RESUME"; resume_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL; resume_btn.custom_minimum_size = Vector2(0, 50); resume_btn.add_theme_stylebox_override("normal", btn_style); resume_btn.add_theme_stylebox_override("hover", btn_h); resume_btn.pressed.connect(func(): _close_settings()); footer_hbox.add_child(resume_btn)
+	
+	var quit_btn = Button.new(); quit_btn.text = ">> TERMINATE"; quit_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL; quit_btn.custom_minimum_size = Vector2(0, 50); quit_btn.add_theme_stylebox_override("normal", btn_style); quit_btn.add_theme_stylebox_override("hover", btn_h); quit_btn.pressed.connect(func(): get_tree().quit()); footer_hbox.add_child(quit_btn)
 
 	# Animation
 	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
 	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
 	tw.tween_property(panel, "modulate:a", 1.0, 0.15)
 	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.2).set_trans(Tween.TRANS_BACK)
+
+func _add_vol_slider(parent: Node, label_text: String, callback: Callable, initial_val: float) -> void:
+	var hbox = HBoxContainer.new(); parent.add_child(hbox)
+	var l = Label.new(); l.text = label_text + ": "; l.custom_minimum_size = Vector2(180, 0); hbox.add_child(l)
+	var s = HSlider.new(); s.size_flags_horizontal = Control.SIZE_EXPAND_FILL; s.min_value = 0.0; s.max_value = 1.0; s.step = 0.05; s.value = initial_val; hbox.add_child(s)
+	s.value_changed.connect(callback)
 
 func _close_settings() -> void:
 	var settings = get_node_or_null("SettingsUI"); if settings: settings.queue_free()
