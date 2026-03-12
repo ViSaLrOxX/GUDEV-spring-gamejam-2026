@@ -372,15 +372,57 @@ func _trigger_game_over() -> void:
 	game_active = false; Engine.time_scale = 1.0; _show_game_over_screen()
 
 func _open_shop() -> void:
-	is_shop_open = true; var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
-	var br_rect = ColorRect.new(); br_rect.size = Vector2(1280, 720); br_rect.color = Color(0, 0, 0, 0.95); canvas.add_child(br_rect)
-	var vbox = VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; vbox.size = Vector2(800, 600); vbox.position = Vector2(640 - 400, 360 - 300); vbox.add_theme_constant_override("separation", 20); canvas.add_child(vbox)
-	var title = Label.new(); title.text = "UPGRADE TERMINAL // ROUND " + str(current_level); title.add_theme_font_size_override("font_size", 48); title.add_theme_color_override("font_color", Color.CYAN * 2.0); title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(title)
-	var max_slots = int(1 + floor(current_level / 10.0)); var info = Label.new(); info.text = "SLOTS USED: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; info.add_theme_font_size_override("font_size", 24); info.add_theme_color_override("font_color", Color.GOLD * 2.0); info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(info)
-	var items = [["EXTRA LIFE", 500, "LIFE"], ["COOLING OVERCLOCK", 350, "COOL"], ["CHRONO-STABILITY", 250, "TIME"], ["SERVO TUNING", 300, "SPEED"]]
+	is_shop_open = true
+	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
+	
+	var tech_cyan = Color(0.2, 0.8, 1.0)
+	var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
+	
+	# Full screen dim
+	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
+	
+	# Main Panel
+	var panel = PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER); panel.custom_minimum_size = Vector2(850, 600); panel.pivot_offset = Vector2(425, 300); canvas.add_child(panel)
+	
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); vbox.offset_left = 40; vbox.offset_top = 40; vbox.offset_right = -40; vbox.offset_bottom = -40
+
+	# Header
+	var title = Label.new(); title.text = "/// UPGRADE_TERMINAL_V4.6"; title.add_theme_font_size_override("font_size", 42); title.add_theme_color_override("font_color", tech_cyan * 2.0); title.add_theme_color_override("font_outline_color", Color.BLACK); title.add_theme_constant_override("outline_size", 8); vbox.add_child(title)
+	
+	var max_slots = int(1 + floor(current_level / 10.0))
+	var info = Label.new(); info.text = "STORAGE: %d/%d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; info.add_theme_font_size_override("font_size", 22); info.modulate = tech_cyan * 0.8; vbox.add_child(info)
+	vbox.add_child(HSeparator.new())
+
+	# Item Grid
+	var grid = GridContainer.new(); grid.columns = 2; grid.add_theme_constant_override("h_separation", 20); grid.add_theme_constant_override("v_separation", 20); vbox.add_child(grid)
+	
+	var items = [
+		["EXTRA LIFE", 500, "LIFE", "RESTORE SYSTEM ON FAILURE"],
+		["OVERCLOCK", 350, "COOL", "REDUCE WEAPON COOLDOWN"],
+		["CHRONO-STAB", 250, "TIME", "EXTEND MISSION DURATION"],
+		["SERVO-TUNE", 300, "SPEED", "INCREASE CHASSIS VELOCITY"]
+	]
+	
+	var btn_normal = StyleBoxFlat.new(); btn_normal.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_normal.border_width_left = 2; btn_normal.border_color = tech_cyan * 0.5; btn_normal.skew = Vector2(0.1, 0.0)
+	var btn_hover = btn_normal.duplicate(); btn_hover.bg_color = tech_cyan * 0.2; btn_hover.border_color = tech_cyan * 2.0
+	
 	for item in items:
-		var b = Button.new(); b.text = "%s: %d Credits" % [item[0], item[1]]; b.custom_minimum_size = Vector2(450, 60); b.pressed.connect(func(): _buy_upgrade(item[2], item[1], info, max_slots)); vbox.add_child(b)
-	var close_btn = Button.new(); close_btn.text = "INITIATE NEXT ROUND"; close_btn.pressed.connect(func(): _close_shop()); vbox.add_child(close_btn)
+		var item_vbox = VBoxContainer.new(); grid.add_child(item_vbox)
+		var b = Button.new(); b.text = "%s [%d]" % [item[0], item[1]]; b.custom_minimum_size = Vector2(380, 70); b.add_theme_stylebox_override("normal", btn_normal); b.add_theme_stylebox_override("hover", btn_hover); b.pressed.connect(func(): _buy_upgrade(item[2], item[1], info, max_slots)); item_vbox.add_child(b)
+		var desc = Label.new(); desc.text = item[3]; desc.add_theme_font_size_override("font_size", 14); desc.modulate = Color.GRAY; item_vbox.add_child(desc)
+
+	vbox.add_spacer(false)
+	var close_btn = Button.new(); close_btn.text = ">> INITIATE_NEXT_SEQUENCE"; close_btn.custom_minimum_size = Vector2(0, 60); close_btn.add_theme_stylebox_override("normal", btn_normal); close_btn.add_theme_stylebox_override("hover", btn_hover); close_btn.pressed.connect(func(): _close_shop()); vbox.add_child(close_btn)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _buy_upgrade(type: String, cost: int, info_label: Label, max_slots: int) -> void:
 	if inventory.size() >= max_slots: _show_big_bonus_message("SLOTS FULL!"); return
@@ -395,14 +437,44 @@ func _close_shop() -> void:
 
 func _show_game_over_screen() -> void:
 	game_active = false; var go = CanvasLayer.new(); go.name = "GameOverUI"; go.layer = 30; add_child(go)
-	var p = ColorRect.new(); p.size = Vector2(1280, 720); p.color = Color(0, 0, 0, 0.9); go.add_child(p)
-	var vbox = VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; vbox.size = Vector2(400, 500); vbox.position = Vector2(640 - 200, 360 - 250); go.add_child(vbox)
-	var t = Label.new(); t.text = "SYSTEM FAILURE"; t.add_theme_font_size_override("font_size", 48); t.add_theme_color_override("font_color", Color.RED * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t); vbox.add_child(HSeparator.new())
+	
+	var alert_red = Color(1.0, 0.2, 0.2)
+	var tech_bg = Color(0.05, 0.01, 0.01, 0.95)
+	
+	var p = ColorRect.new(); p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.color = Color(0.1, 0, 0, 0.7); go.add_child(p)
+	
+	var panel = PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER); panel.custom_minimum_size = Vector2(600, 550); panel.pivot_offset = Vector2(300, 275); go.add_child(panel)
+	
+	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = alert_red; p_style.skew = Vector2(-0.05, 0.0); p_style.shadow_color = alert_red * 0.3; p_style.shadow_size = 25
+	panel.add_theme_stylebox_override("panel", p_style)
+	
+	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 20); panel.add_child(vbox)
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); vbox.offset_left = 40; vbox.offset_top = 40; vbox.offset_right = -40; vbox.offset_bottom = -40
+
+	var t = Label.new(); t.text = "CRITICAL_SYSTEM_FAILURE"; t.add_theme_font_size_override("font_size", 42); t.add_theme_color_override("font_color", alert_red * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t)
+	vbox.add_child(HSeparator.new())
+	
+	var stats_vbox = VBoxContainer.new(); stats_vbox.add_theme_constant_override("separation", 10); vbox.add_child(stats_vbox)
 	var s = [["ROUND REACHED", current_level], ["ELIMINATIONS", total_enemies_killed], ["CREDITS EARNED", total_coins_collected], ["TIME SURVIVED", "%.1fs" % total_time_elapsed]]
 	for stat in s:
-		var l = Label.new(); l.text = "%s: %s" % [stat[0], str(stat[1])]; l.add_theme_font_size_override("font_size", 24); l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(l)
-	var rb = Button.new(); rb.text = "RESTART SYSTEM"; rb.custom_minimum_size = Vector2(200, 50); rb.pressed.connect(func(): get_tree().reload_current_scene()); vbox.add_child(rb)
-	var mb = Button.new(); mb.text = "EXIT TO MAIN MENU"; mb.custom_minimum_size = Vector2(200, 50); mb.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu.tscn")); vbox.add_child(mb)
+		var hbox = HBoxContainer.new(); stats_vbox.add_child(hbox)
+		var l_stat = Label.new(); l_stat.text = stat[0]; l_stat.modulate = Color.GRAY; hbox.add_child(l_stat)
+		var spacer = Control.new(); spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hbox.add_child(spacer)
+		var r_stat = Label.new(); r_stat.text = str(stat[1]); r_stat.add_theme_color_override("font_color", alert_red); hbox.add_child(r_stat)
+
+	vbox.add_spacer(false)
+	
+	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.2, 0.05, 0.05, 0.5); btn_style.border_width_left = 2; btn_style.border_color = alert_red * 0.5; btn_style.skew = Vector2(-0.1, 0.0)
+	var btn_h = btn_style.duplicate(); btn_h.bg_color = alert_red * 0.2; btn_h.border_color = alert_red * 2.0
+	
+	var rb = Button.new(); rb.text = "REBOOT_SYSTEM"; rb.custom_minimum_size = Vector2(0, 50); rb.add_theme_stylebox_override("normal", btn_style); rb.add_theme_stylebox_override("hover", btn_h); rb.pressed.connect(func(): get_tree().reload_current_scene()); vbox.add_child(rb)
+	var mb = Button.new(); mb.text = "TERMINAL_EXIT"; mb.custom_minimum_size = Vector2(0, 50); mb.add_theme_stylebox_override("normal", btn_style); mb.add_theme_stylebox_override("hover", btn_h); mb.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu.tscn")); vbox.add_child(mb)
+
+	# Animation
+	panel.modulate.a = 0.0; panel.scale = Vector2(1.1, 1.1)
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(panel, "modulate:a", 1.0, 0.2)
+	tw.tween_property(panel, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_OUT)
 
 func portal_entered() -> void:
 	if portal_unlocked:
