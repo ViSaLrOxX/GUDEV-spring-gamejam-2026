@@ -7,6 +7,22 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load_sounds()
 	_create_pool()
+	_setup_music_player()
+
+func _setup_music_player() -> void:
+	_music_player = AudioStreamPlayer.new()
+	_music_player.name = "MusicPlayer"
+	add_child(_music_player)
+
+func play_music(file_name: String) -> void:
+	var path = "res://assets/music/" + file_name
+	if FileAccess.file_exists(path):
+		var stream = load(path)
+		_music_player.stream = stream
+		_music_player.volume_db = linear_to_db(_master_volume * 0.6)
+		_music_player.play()
+	else:
+		print("[AudioManager] Music file not found: ", path)
 
 func _load_sounds() -> void:
 	var sfx_path = "res://assets/sound_effects/"
@@ -30,6 +46,7 @@ var _pool_size = 16
 var _pool = []
 var _next_player = 0
 var _master_volume = 1.0
+var _music_player : AudioStreamPlayer
 
 func _create_pool() -> void:
 	for i in range(_pool_size):
@@ -42,6 +59,8 @@ func set_volume(value: float) -> void:
 	var db = linear_to_db(_master_volume)
 	for p in _pool:
 		p.volume_db = db
+	if _music_player:
+		_music_player.volume_db = linear_to_db(_master_volume * 0.6)
 
 func get_volume() -> float:
 	return _master_volume

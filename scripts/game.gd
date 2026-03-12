@@ -88,6 +88,10 @@ func _ready() -> void:
 	add_to_group("game")
 	dynamic_entities = Node2D.new(); dynamic_entities.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_entities)
 	dynamic_walls = Node2D.new(); dynamic_walls.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_walls)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_music("music.mp3") # Ensure file is in assets/music/
+		
 	# _setup_screen_shader()
 	_setup_overscreen_hud()
 	_clear_static_nodes()
