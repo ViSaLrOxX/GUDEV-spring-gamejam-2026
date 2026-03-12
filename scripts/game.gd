@@ -86,7 +86,7 @@ func _ready() -> void:
 	add_to_group("game")
 	dynamic_entities = Node2D.new(); add_child(dynamic_entities)
 	dynamic_walls = Node2D.new(); add_child(dynamic_walls)
-	_setup_screen_shader()
+	# _setup_screen_shader()
 	_setup_overscreen_hud()
 	_clear_static_nodes()
 	_start_level(1, false)
@@ -180,11 +180,13 @@ func _setup_overscreen_hud() -> void:
 	
 	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 64); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); coins_bank_label.add_theme_color_override("font_outline_color", Color.BLACK); coins_bank_label.add_theme_constant_override("outline_size", 12); br_hbox.add_child(coins_bank_label)
 
-	# Combo/Shop/Fade
+	# Combo/Shop
 	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 96); combo_label.add_theme_color_override("font_outline_color", Color.BLACK); combo_label.add_theme_constant_override("outline_size", 16); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
 	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 42); shop_hint_label.add_theme_color_override("font_outline_color", Color.BLACK); shop_hint_label.add_theme_constant_override("outline_size", 8); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
 
-	fade_overlay = ColorRect.new(); fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); ui.add_child(fade_overlay)
+	# Dedicated Fade Layer (Ensures it's on top and doesn't block UI)
+	var fade_canvas = CanvasLayer.new(); fade_canvas.name = "FadeLayer"; fade_canvas.layer = 99; add_child(fade_canvas)
+	fade_overlay = ColorRect.new(); fade_overlay.name = "FadeOverlay"; fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE; fade_overlay.visible = true; fade_canvas.add_child(fade_overlay)
 
 	# Subtle Scanline Overlay
 	var scanline = ReferenceRect.new(); scanline.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); scanline.mouse_filter = Control.MOUSE_FILTER_IGNORE; scanline.border_color = Color(0.2, 0.8, 1.0, 0.05); scanline.border_width = 1.0; scanline.editor_only = false; root.add_child(scanline)
