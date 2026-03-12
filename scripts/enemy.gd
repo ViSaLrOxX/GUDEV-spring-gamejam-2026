@@ -203,6 +203,10 @@ func hit_by_bullet() -> void:
 
 func die() -> void:
 	_is_dead = true
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("hit")
+		
 	if _blood_scene:
 		var blood = _blood_scene.instantiate()
 		get_parent().add_child(blood)

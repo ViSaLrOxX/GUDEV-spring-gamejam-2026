@@ -15,6 +15,8 @@ func _process(delta: float) -> void:
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):
+		if has_node("/root/AudioManager"):
+			get_node("/root/AudioManager").play_sfx("pickup")
 		var game := get_tree().get_first_node_in_group("game")
 		if game:
 			game.collect_core()

@@ -278,6 +278,7 @@ func _process(delta: float) -> void:
 	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
 		# Add a small delay/buffer before checking group size to ensure nodes are in tree
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
+			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("shoot") # WIPEOUT SFX
 			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 			return
 
@@ -324,6 +325,8 @@ func player_shoot(lethal: bool = false) -> void:
 	_pulse_zoom(BASE_ZOOM + 0.05, 40.0) 
 
 func player_hit(amount: float = HIT_COST) -> void:
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("hit")
 	subtract_time(amount); trigger_screen_shake(0.3, 15.0); _pulse_zoom(BASE_ZOOM - 0.1, 20.0)
 
 func enemy_killed() -> void:
@@ -425,11 +428,17 @@ func _open_shop() -> void:
 	
 	for item in items:
 		var item_vbox = VBoxContainer.new(); grid.add_child(item_vbox)
-		var b = Button.new(); b.text = "%s [%d]" % [item[0], item[1]]; b.custom_minimum_size = Vector2(380, 70); b.add_theme_stylebox_override("normal", btn_normal); b.add_theme_stylebox_override("hover", btn_hover); b.pressed.connect(func(): _buy_upgrade(item[2], item[1], info, max_slots)); item_vbox.add_child(b)
+		var b = Button.new(); b.text = "%s [%d]" % [item[0], item[1]]; b.custom_minimum_size = Vector2(380, 70); b.add_theme_stylebox_override("normal", btn_normal); b.add_theme_stylebox_override("hover", btn_hover); b.pressed.connect(func(): 
+			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+			_buy_upgrade(item[2], item[1], info, max_slots)
+		); item_vbox.add_child(b)
 		var desc = Label.new(); desc.text = item[3]; desc.add_theme_font_size_override("font_size", 14); desc.modulate = Color.GRAY; item_vbox.add_child(desc)
 
 	vbox.add_spacer(false)
-	var close_btn = Button.new(); close_btn.text = ">> INITIATE_NEXT_SEQUENCE"; close_btn.custom_minimum_size = Vector2(0, 60); close_btn.add_theme_stylebox_override("normal", btn_normal); close_btn.add_theme_stylebox_override("hover", btn_hover); close_btn.pressed.connect(func(): _close_shop()); vbox.add_child(close_btn)
+	var close_btn = Button.new(); close_btn.text = ">> INITIATE_NEXT_SEQUENCE"; close_btn.custom_minimum_size = Vector2(0, 60); close_btn.add_theme_stylebox_override("normal", btn_normal); close_btn.add_theme_stylebox_override("hover", btn_hover); close_btn.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		_close_shop()
+	); vbox.add_child(close_btn)
 
 	# Animation
 	panel.modulate.a = 0.0; panel.scale = Vector2(0.9, 0.9)
@@ -483,8 +492,14 @@ func _show_game_over_screen() -> void:
 	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.2, 0.05, 0.05, 0.5); btn_style.border_width_left = 2; btn_style.border_color = alert_red * 0.5; btn_style.skew = Vector2(-0.1, 0.0)
 	var btn_h = btn_style.duplicate(); btn_h.bg_color = alert_red * 0.2; btn_h.border_color = alert_red * 2.0
 	
-	var rb = Button.new(); rb.text = "REBOOT_SYSTEM"; rb.custom_minimum_size = Vector2(0, 50); rb.add_theme_stylebox_override("normal", btn_style); rb.add_theme_stylebox_override("hover", btn_h); rb.pressed.connect(func(): get_tree().reload_current_scene()); vbox.add_child(rb)
-	var mb = Button.new(); mb.text = "TERMINAL_EXIT"; mb.custom_minimum_size = Vector2(0, 50); mb.add_theme_stylebox_override("normal", btn_style); mb.add_theme_stylebox_override("hover", btn_h); mb.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu.tscn")); vbox.add_child(mb)
+	var rb = Button.new(); rb.text = "REBOOT_SYSTEM"; rb.custom_minimum_size = Vector2(0, 50); rb.add_theme_stylebox_override("normal", btn_style); rb.add_theme_stylebox_override("hover", btn_h); rb.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		get_tree().reload_current_scene()
+	); vbox.add_child(rb)
+	var mb = Button.new(); mb.text = "TERMINAL_EXIT"; mb.custom_minimum_size = Vector2(0, 50); mb.add_theme_stylebox_override("normal", btn_style); mb.add_theme_stylebox_override("hover", btn_h); mb.pressed.connect(func(): 
+		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
+		get_tree().change_scene_to_file("res://scenes/menu.tscn")
+	); vbox.add_child(mb)
 
 	# Animation
 	panel.modulate.a = 0.0; panel.scale = Vector2(1.1, 1.1)

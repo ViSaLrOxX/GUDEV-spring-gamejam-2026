@@ -105,6 +105,10 @@ func _shoot() -> void:
 	bullet.rotation        = global_rotation
 	if bullet.has_method("launch"):
 		bullet.launch(shoot_dir * bullet_speed)
+	
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("shoot")
+		
 	if _game:
 		_game.player_shoot(is_lethal)
 
