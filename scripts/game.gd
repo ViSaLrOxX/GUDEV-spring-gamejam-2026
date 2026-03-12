@@ -217,6 +217,11 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
 	var go = get_node_or_null("GameOverUI"); if go: go.queue_free()
 	
+	if player: 
+		player.process_mode = Node.PROCESS_MODE_PAUSABLE
+		player.move_speed = 130.0 * (1.0 + inventory.count("SPEED") * 0.15)
+		player.shoot_cooldown = 0.3 * (1.0 - inventory.count("COOL") * 0.15)
+
 	for child in $UI.get_children():
 		if child is Label:
 			if child.name.begins_with("BonusLabel") or child.text.contains("!") or child.text.contains("WIPEOUT"): 
@@ -226,9 +231,7 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	if fade_overlay:
 		fade_overlay.color = Color.BLACK
 		var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(fade_overlay, "color:a", 0.0, 0.2)
-	if player:
-		player.move_speed = 130.0 * (1.0 + inventory.count("SPEED") * 0.15)
-		player.shoot_cooldown = 0.3 * (1.0 - inventory.count("COOL") * 0.15)
+	
 	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 5.0 + (inventory.count("TIME") * 10.0)
 	for child in dynamic_entities.get_children(): child.queue_free()
 	for child in dynamic_walls.get_children(): child.queue_free()
@@ -383,10 +386,13 @@ func _open_shop() -> void:
 	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
 	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	
-	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
-	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
+	# Root control to allow proper centering
+	var root_ctrl = Control.new(); root_ctrl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(root_ctrl)
 	
-	var panel = PanelContainer.new(); canvas.add_child(panel)
+	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
+	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); root_ctrl.add_child(bg_rect)
+	
+	var panel = PanelContainer.new(); root_ctrl.add_child(panel)
 	panel.custom_minimum_size = Vector2(850, 600)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.pivot_offset = Vector2(425, 300)
@@ -396,7 +402,6 @@ func _open_shop() -> void:
 	panel.add_theme_stylebox_override("panel", p_style)
 	
 	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
-	# No manual offsets on vbox, container handles it now with content_margins
 
 	# Header
 	var title = Label.new(); title.text = "/// UPGRADE_TERMINAL_V4.6"; title.add_theme_font_size_override("font_size", 42); title.add_theme_color_override("font_color", tech_cyan * 2.0); title.add_theme_color_override("font_outline_color", Color.BLACK); title.add_theme_constant_override("outline_size", 8); vbox.add_child(title)
