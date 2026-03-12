@@ -207,7 +207,7 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	if _transition_tween: _transition_tween.kill(); _transition_tween = null
 
 	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true
-	# Ensure time_scale is 1.0 so UI animations/fades work
+	# Keep time_scale at NORMAL so logic/UI works, we use SLOW once waiting starts
 	Engine.time_scale = 1.0 
 	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE; _ghost_check_timer = 2.0
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
@@ -261,10 +261,12 @@ func _process(delta: float) -> void:
 			if shake_duration <= 0.0: camera.offset = Vector2.ZERO
 
 	if is_shop_open: return
+	
 	if is_waiting_to_start:
 		if _transition_lock_timer > 0.0: _transition_lock_timer -= real_delta; shop_hint_label.text = "SYNCING..."
 		else: shop_hint_label.text = "MOVE TO INITIATE"
-		Engine.time_scale = 0.0
+		# Must stay at SLOW (0.05) NOT 0.0, otherwise player scripts stop running
+		Engine.time_scale = SLOW_TIME_SCALE
 		return
 
 	if not game_active:
@@ -386,15 +388,12 @@ func _open_shop() -> void:
 	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
 	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	
-	# Root control to allow proper centering
-	var root_ctrl = Control.new(); root_ctrl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(root_ctrl)
+	# CenterContainer is the most robust way to center things in Godot 4
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
 	
 	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
-	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); root_ctrl.add_child(bg_rect)
 	
-	var panel = PanelContainer.new(); root_ctrl.add_child(panel)
-	panel.custom_minimum_size = Vector2(850, 600)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(850, 600); center.add_child(panel)
 	panel.pivot_offset = Vector2(425, 300)
 	
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
@@ -408,7 +407,8 @@ func _open_shop() -> void:
 	
 	var max_slots = int(1 + floor(current_level / 10.0))
 	var info = Label.new(); info.text = "STORAGE: %d/%d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; info.add_theme_font_size_override("font_size", 22); info.modulate = tech_cyan * 0.8; vbox.add_child(info)
-	vbox.add_child(HSeparator.new())
+	
+	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
 
 	# Item Grid
 	var grid = GridContainer.new(); grid.columns = 2; grid.add_theme_constant_override("h_separation", 20); grid.add_theme_constant_override("v_separation", 20); vbox.add_child(grid)
@@ -447,7 +447,7 @@ func _close_shop() -> void:
 	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
 	is_shop_open = false; get_tree().paused = false; _last_real_ms = Time.get_ticks_msec()
 	_transition_lock_timer = 0.2 # Reduced delay
-	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = 0.0; target_time_scale = SLOW_TIME_SCALE
+	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = SLOW_TIME_SCALE; target_time_scale = SLOW_TIME_SCALE
 	shop_hint_label.visible = true; shop_hint_label.text = "MOVE TO INITIATE"
 
 func _show_game_over_screen() -> void:
@@ -458,16 +458,17 @@ func _show_game_over_screen() -> void:
 	
 	var p = ColorRect.new(); p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.color = Color(0.1, 0, 0, 0.7); go.add_child(p)
 	
-	var panel = PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER); panel.custom_minimum_size = Vector2(600, 550); panel.pivot_offset = Vector2(300, 275); go.add_child(panel)
+	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); go.add_child(center)
+	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(600, 550); panel.pivot_offset = Vector2(300, 275); center.add_child(panel)
 	
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = alert_red; p_style.skew = Vector2(-0.05, 0.0); p_style.shadow_color = alert_red * 0.3; p_style.shadow_size = 25
+	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
 	panel.add_theme_stylebox_override("panel", p_style)
 	
 	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 20); panel.add_child(vbox)
-	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); vbox.offset_left = 40; vbox.offset_top = 40; vbox.offset_right = -40; vbox.offset_bottom = -40
 
 	var t = Label.new(); t.text = "CRITICAL_SYSTEM_FAILURE"; t.add_theme_font_size_override("font_size", 42); t.add_theme_color_override("font_color", alert_red * 2.0); t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(t)
-	vbox.add_child(HSeparator.new())
+	var sep = HSeparator.new(); sep.custom_minimum_size = Vector2(0, 10); vbox.add_child(sep)
 	
 	var stats_vbox = VBoxContainer.new(); stats_vbox.add_theme_constant_override("separation", 10); vbox.add_child(stats_vbox)
 	var s = [["ROUND REACHED", current_level], ["ELIMINATIONS", total_enemies_killed], ["CREDITS EARNED", total_coins_collected], ["TIME SURVIVED", "%.1fs" % total_time_elapsed]]
