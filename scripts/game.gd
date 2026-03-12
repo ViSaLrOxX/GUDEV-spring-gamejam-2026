@@ -376,15 +376,23 @@ func _trigger_game_over() -> void:
 	game_active = false; Engine.time_scale = 1.0; _show_game_over_screen()
 
 func _open_shop() -> void:
-	is_shop_open = true; Engine.time_scale = 1.0 # Ensure tweens run
+	is_shop_open = true
+	get_tree().paused = true # Pause the game world
+	
 	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS # Ensure UI processes while paused
 	
 	var tech_cyan = Color(0.2, 0.8, 1.0)
 	var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
 	
 	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
 	
-	var panel = PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER); panel.custom_minimum_size = Vector2(850, 600); panel.pivot_offset = Vector2(425, 300); canvas.add_child(panel)
+	var panel = PanelContainer.new(); canvas.add_child(panel)
+	panel.custom_minimum_size = Vector2(850, 600)
+	# Correct centering in Godot 4
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -425; panel.offset_top = -300; panel.offset_right = 425; panel.offset_bottom = 300
+	panel.pivot_offset = Vector2(425, 300)
 	
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
 	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
@@ -434,9 +442,12 @@ func _buy_upgrade(type: String, cost: int, info_label: Label, max_slots: int) ->
 	else: _show_big_bonus_message("INSUFFICIENT CREDITS")
 
 func _close_shop() -> void:
-	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free(); is_shop_open = false; _transition_lock_timer = TRANSITION_DELAY
-	# Immediately start the game if they pressed the button
-	is_waiting_to_start = false; shop_hint_label.visible = false; _last_real_ms = Time.get_ticks_msec()
+	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
+	is_shop_open = false; get_tree().paused = false
+	_transition_lock_timer = TRANSITION_DELAY
+	# Reset state to waiting for player movement
+	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = 0.0; target_time_scale = SLOW_TIME_SCALE
+	shop_hint_label.visible = true; shop_hint_label.text = "MOVE TO INITIATE"
 
 func _show_game_over_screen() -> void:
 	game_active = false; var go = CanvasLayer.new(); go.name = "GameOverUI"; go.layer = 30; add_child(go)
