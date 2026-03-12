@@ -140,22 +140,22 @@ func _setup_overscreen_hud() -> void:
 	var tl_panel = PanelContainer.new(); tl_panel.position = Vector2(40, 40); tl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tl_panel)
 	var tl_vbox = VBoxContainer.new(); tl_vbox.custom_minimum_size = Vector2(400, 0); tl_vbox.add_theme_constant_override("separation", 5); tl_panel.add_child(tl_vbox)
 	
-	var time_header = Label.new(); time_header.text = "[ SYSTEM_STABILITY ]"; time_header.add_theme_font_size_override("font_size", 14); time_header.modulate = tech_cyan * 0.7; tl_vbox.add_child(time_header)
+	var time_header = Label.new(); time_header.text = "[ SYSTEM_STABILITY ]"; time_header.add_theme_font_size_override("font_size", 16); time_header.add_theme_color_override("font_outline_color", Color.BLACK); time_header.add_theme_constant_override("outline_size", 6); time_header.modulate = tech_cyan * 2.0; tl_vbox.add_child(time_header)
 	
 	time_bar = ProgressBar.new(); time_bar.custom_minimum_size = Vector2(0, 28); time_bar.show_percentage = false; tl_vbox.add_child(time_bar)
 	var bar_bg = base_style.duplicate(); bar_bg.bg_color = Color(0,0,0,0.4); bar_bg.border_width_left = 1; bar_bg.border_width_top = 1; bar_bg.border_width_right = 1; bar_bg.border_width_bottom = 1; bar_bg.border_color = tech_cyan * 0.4
 	var bar_fg = base_style.duplicate(); bar_fg.bg_color = tech_cyan * 2.0; bar_fg.border_width_left = 0; bar_fg.border_width_top = 0
 	time_bar.add_theme_stylebox_override("background", bar_bg); time_bar.add_theme_stylebox_override("fill", bar_fg)
 	
-	inventory_label = Label.new(); inventory_label.text = "NODES: NULL"; inventory_label.add_theme_font_size_override("font_size", 16); inventory_label.modulate = tech_cyan * 1.5; tl_vbox.add_child(inventory_label)
+	inventory_label = Label.new(); inventory_label.text = "NODES: NULL"; inventory_label.add_theme_font_size_override("font_size", 18); inventory_label.add_theme_color_override("font_outline_color", Color.BLACK); inventory_label.add_theme_constant_override("outline_size", 6); inventory_label.modulate = tech_cyan * 2.0; tl_vbox.add_child(inventory_label)
 
 	# 3. Threat/Round Panel (Top Right)
 	var tr_panel = PanelContainer.new(); tr_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_panel.offset_left = -440; tr_panel.offset_top = 40; tr_panel.offset_right = -40; tr_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tr_panel)
 	var tr_vbox = VBoxContainer.new(); tr_vbox.alignment = BoxContainer.ALIGNMENT_END; tr_panel.add_child(tr_vbox)
 	
-	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 48); level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(level_label)
+	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 72); level_label.add_theme_color_override("font_outline_color", Color.BLACK); level_label.add_theme_constant_override("outline_size", 10); level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(level_label)
 	
-	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 20); enemies_remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(enemies_remaining_label)
+	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 24); enemies_remaining_label.add_theme_color_override("font_outline_color", Color.BLACK); enemies_remaining_label.add_theme_constant_override("outline_size", 8); enemies_remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(enemies_remaining_label)
 	
 	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(300, 12); progress_bar.show_percentage = false; tr_vbox.add_child(progress_bar)
 	var core_fg = bar_fg.duplicate(); core_fg.bg_color = Color(1.0, 0.4, 0.8) * 3.0; progress_bar.add_theme_stylebox_override("background", bar_bg); progress_bar.add_theme_stylebox_override("fill", core_fg)
@@ -164,7 +164,7 @@ func _setup_overscreen_hud() -> void:
 	var bl_panel = PanelContainer.new(); bl_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); bl_panel.offset_left = 40; bl_panel.offset_bottom = -40; bl_panel.offset_top = -100; bl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(bl_panel)
 	var bl_vbox = VBoxContainer.new(); bl_vbox.custom_minimum_size = Vector2(300, 0); bl_panel.add_child(bl_vbox)
 	
-	var weapon_header = Label.new(); weapon_header.text = "[ PULSE_CAPACITOR ]"; weapon_header.add_theme_font_size_override("font_size", 14); weapon_header.modulate = tech_cyan * 0.7; bl_vbox.add_child(weapon_header)
+	var weapon_header = Label.new(); weapon_header.text = "[ PULSE_CAPACITOR ]"; weapon_header.add_theme_font_size_override("font_size", 16); weapon_header.add_theme_color_override("font_outline_color", Color.BLACK); weapon_header.add_theme_constant_override("outline_size", 6); weapon_header.modulate = tech_cyan * 2.0; bl_vbox.add_child(weapon_header)
 	
 	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(0, 14); cooldown_bar.show_percentage = false; bl_vbox.add_child(cooldown_bar)
 	var heat_fg = bar_fg.duplicate(); heat_fg.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("background", bar_bg); cooldown_bar.add_theme_stylebox_override("fill", heat_fg)
@@ -173,13 +173,14 @@ func _setup_overscreen_hud() -> void:
 	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -440; br_panel.offset_bottom = -40; br_panel.offset_top = -120; br_panel.offset_right = -40; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
 	var br_vbox = VBoxContainer.new(); br_vbox.alignment = BoxContainer.ALIGNMENT_END; br_panel.add_child(br_vbox)
 	
-	var credit_header = Label.new(); credit_header.text = "CREDITS // UNSTABLE"; credit_header.add_theme_font_size_override("font_size", 14); credit_header.modulate = Color.GOLD * 0.7; br_vbox.add_child(credit_header)
+	var credit_header = Label.new(); credit_header.text = "CREDITS // UNSTABLE"; credit_header.add_theme_font_size_override("font_size", 16); credit_header.add_theme_color_override("font_outline_color", Color.BLACK); credit_header.add_theme_constant_override("outline_size", 6); credit_header.modulate = Color.GOLD * 2.0; br_vbox.add_child(credit_header)
 	
-	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 64); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); br_vbox.add_child(coins_bank_label)
+	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 72); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); coins_bank_label.add_theme_color_override("font_outline_color", Color.BLACK); coins_bank_label.add_theme_constant_override("outline_size", 12); br_vbox.add_child(coins_bank_label)
 
 	# Combo/Shop/Fade
-	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 80); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
-	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 32); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
+	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 96); combo_label.add_theme_color_override("font_outline_color", Color.BLACK); combo_label.add_theme_constant_override("outline_size", 16); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
+	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 42); shop_hint_label.add_theme_color_override("font_outline_color", Color.BLACK); shop_hint_label.add_theme_constant_override("outline_size", 8); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
+
 	fade_overlay = ColorRect.new(); fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); ui.add_child(fade_overlay)
 
 	# Subtle Scanline Overlay
