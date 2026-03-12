@@ -34,6 +34,8 @@ var _is_dying          : bool  = false
 var _death_grace_timer : float = 0.0
 const DEATH_GRACE_TIME : float = 0.4
 var _is_transitioning  : bool  = false
+var _transition_tween  : Tween = null
+var _ghost_check_timer : float = 0.0
 
 # Shot Heat System
 var _shot_heat_multiplier : int = 0
@@ -135,8 +137,10 @@ func _clear_static_nodes() -> void:
 		for child in wall_visuals.get_children(): child.queue_free()
 
 func _start_level(level: int, open_shop: bool = true) -> void:
+	if _transition_tween: _transition_tween.kill(); _transition_tween = null
+
 	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true; Engine.time_scale = 0.0 
-	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE
+	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE; _ghost_check_timer = 2.0
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
 	
@@ -188,11 +192,16 @@ func _process(delta: float) -> void:
 	if is_waiting_to_start:
 		if _transition_lock_timer > 0.0: _transition_lock_timer -= real_delta; shop_hint_label.text = "SYNCING..."
 		else: shop_hint_label.text = "MOVE TO INITIATE"
+		Engine.time_scale = 0.0
 		return
-	if not game_active: return
+
+	if not game_active:
+		if _is_transitioning: Engine.time_scale = 1.0
+		return
 
 	# Ghost enemy safety check - Only after level has started and settled
-	if not _is_transitioning and total_enemies_in_level > 0:
+	_ghost_check_timer -= real_delta
+	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
 		# Add a small delay/buffer before checking group size to ensure nodes are in tree
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
 			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
@@ -207,7 +216,8 @@ func _process(delta: float) -> void:
 	
 	# Stable frame-independent time scale lerp
 	var ts_weight = 1.0 - exp(-TIME_LERP_SPEED * real_delta)
-	Engine.time_scale = lerp(Engine.time_scale, target_time_scale, ts_weight)
+	var next_ts = lerp(Engine.time_scale, target_time_scale, ts_weight)
+	Engine.time_scale = clampf(next_ts, 0.0, 1.0)
 	
 	if combo_count > 0:
 		combo_timer -= real_delta
@@ -253,9 +263,11 @@ func enemy_killed() -> void:
 func _initiate_level_transition(delay: float) -> void:
 	if _is_transitioning: return
 	_is_transitioning = true; game_active = false; Engine.time_scale = 1.0; _target_zoom = BASE_ZOOM + 0.3
-	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_interval(delay)
-	tw.tween_callback(func():
-		if fade_overlay:
+	
+	_transition_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_transition_tween.tween_interval(delay)
+	_transition_tween.tween_callback(func():
+		if is_instance_valid(fade_overlay):
 			var ftw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 			ftw.tween_property(fade_overlay, "color:a", 1.0, 0.2)
 			ftw.finished.connect(func(): _start_level(current_level + 1))
