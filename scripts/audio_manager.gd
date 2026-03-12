@@ -38,12 +38,14 @@ func _create_pool() -> void:
 
 func play_sfx(sound_name: String, pitch_rng: float = 0.1) -> void:
 	if not sounds.has(sound_name) or sounds[sound_name] == null:
+		print("[AudioManager] Cannot play: ", sound_name)
 		return
 		
 	var player = _pool[_next_player]
 	player.stream = sounds[sound_name]
 	player.pitch_scale = randf_range(1.0 - pitch_rng, 1.0 + pitch_rng)
 	player.play()
+	# print("[AudioManager] Playing: ", sound_name)
 	
 	_next_player = (_next_player + 1) % _pool_size
 

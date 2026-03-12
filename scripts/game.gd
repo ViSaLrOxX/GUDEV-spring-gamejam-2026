@@ -278,7 +278,6 @@ func _process(delta: float) -> void:
 	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
 		# Add a small delay/buffer before checking group size to ensure nodes are in tree
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
-			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("explosion") # Impactful WIPEOUT
 			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 			return
 
@@ -334,7 +333,10 @@ func enemy_killed() -> void:
 	total_enemies_killed += 1; enemies_killed_in_level += 1
 	if _is_dying: _is_dying = false; time_remaining = 3.0
 	combo_count = mini(combo_count + 1, MAX_COMBO); combo_timer = COMBO_WINDOW; var reward = BASE_KILL_REWARD * combo_count; add_time(reward); _show_combo_popup(combo_count, reward); _pulse_zoom(1.02, 20.0)
+	
 	if enemies_killed_in_level >= total_enemies_in_level:
+		if has_node("/root/AudioManager"): 
+			get_node("/root/AudioManager").play_sfx("explosion")
 		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 
 func _initiate_level_transition(delay: float) -> void:
