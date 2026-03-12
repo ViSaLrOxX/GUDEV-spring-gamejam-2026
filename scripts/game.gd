@@ -596,7 +596,7 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 	for i in range(num_freezes):
 		var tf = time_freeze_scene.instantiate(); tf.global_position = _get_random_pos(w, h, inner_rects, safe_zone); dynamic_entities.add_child(tf)
 	
-	var num_enemies = level; var types = ["melee", "ranged", "turret", "patrol"]
+	var num_enemies = level * 2; var types = ["melee", "ranged", "turret", "patrol"]
 	var spawned_count = 0
 	for i in range(num_enemies):
 		var e = enemy_scene.instantiate(); e.global_position = _get_random_pos(w, h, inner_rects, safe_zone)
