@@ -278,7 +278,7 @@ func _process(delta: float) -> void:
 	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
 		# Add a small delay/buffer before checking group size to ensure nodes are in tree
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
-			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("shoot") # WIPEOUT SFX
+			if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("explosion") # Impactful WIPEOUT
 			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
 			return
 

@@ -13,8 +13,9 @@ func _load_sounds() -> void:
 	var to_load = {
 		"shoot": "laserShoot.wav",
 		"hit": "hitHurt.wav",
-		"pickup": "laserShoot.wav", # Fallback
-		"click": "hitHurt.wav"      # Fallback
+		"pickup": "pickup.wav",
+		"click": "click.wav",
+		"explosion": "explosion.wav"
 	}
 	
 	for key in to_load:
