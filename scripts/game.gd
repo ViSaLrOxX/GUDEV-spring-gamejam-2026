@@ -245,7 +245,11 @@ func _initiate_level_transition(delay: float) -> void:
 	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_interval(delay)
 	tw.tween_callback(func():
 		if fade_overlay:
-			var ftw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); ftw.tween_property(fade_overlay, "color:a", 1.0, 0.2); ftw.finished.connect(func(): _start_level(current_level + 1))
+			var ftw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			ftw.tween_property(fade_overlay, "color:a", 1.0, 0.2)
+			ftw.finished.connect(func(): _start_level(current_level + 1))
+		else:
+			_start_level(current_level + 1)
 	)
 
 func _pulse_zoom(amt: float, speed: float) -> void:
@@ -299,6 +303,8 @@ func _buy_upgrade(type: String, cost: int, info_label: Label, max_slots: int) ->
 
 func _close_shop() -> void:
 	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free(); is_shop_open = false; _transition_lock_timer = TRANSITION_DELAY
+	# Immediately start the game if they pressed the button
+	is_waiting_to_start = false; shop_hint_label.visible = false; _last_real_ms = Time.get_ticks_msec()
 
 func _show_game_over_screen() -> void:
 	game_active = false; var go = CanvasLayer.new(); go.layer = 30; add_child(go)
@@ -318,7 +324,7 @@ func portal_entered() -> void:
 
 func _show_big_bonus_message(txt: String) -> void:
 	var label = Label.new(); label.name = "BonusLabel_" + str(Time.get_ticks_msec()); label.text = txt; label.add_theme_font_size_override("font_size", 48); label.add_theme_color_override("font_color", Color.GOLD * 2.0); label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; label.size = Vector2(1280, 100); label.position = Vector2(0, 300); $UI.add_child(label)
-	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8); tw.finished.connect(func(): label.queue_free())
+	var tw = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS); tw.tween_property(label, "scale", Vector2(1.2, 1.2), 0.1); tw.tween_property(label, "scale", Vector2(1.0, 1.0), 0.1); tw.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.8); tw.finished.connect(func(): if is_instance_valid(label): label.queue_free())
 
 func _update_ui() -> void:
 	if time_bar:
@@ -386,12 +392,18 @@ func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)
 
 func _get_random_pos(w: float, h: float, inner_rects: Array, safe_zone: Rect2) -> Vector2:
-	var best_p = Vector2(w/2.0 + 100.0, h/2.0 + 100.0)
-	for i in range(100):
+	for i in range(250): # Increased attempts
 		var p = Vector2(randf_range(80, w - 80), randf_range(80, h - 80)); if safe_zone.has_point(p): continue
-		var valid = true; for r in inner_rects: if r.grow(45.0).has_point(p): valid = false; break
+		var valid = true; for r in inner_rects: if r.grow(50.0).has_point(p): valid = false; break
 		if valid: return p
-	return best_p
+	
+	# Fallback: ignore safe zone if desperate
+	for i in range(50):
+		var p = Vector2(randf_range(50, w - 50), randf_range(50, h - 50))
+		var valid = true; for r in inner_rects: if r.grow(30.0).has_point(p): valid = false; break
+		if valid: return p
+
+	return Vector2(w/2.0, h/2.0) + Vector2(randf_range(-50, 50), randf_range(-50, 50))
 
 func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void:
 	var sz = minf(w, h) * 0.25; var safe_zone = Rect2(w/2.0 - sz, h/2.0 - sz, sz * 2.0, sz * 2.0); portal_instance = portal_scene.instantiate(); portal_instance.global_position = _get_random_pos(w, h, inner_rects, safe_zone); dynamic_entities.add_child(portal_instance)
