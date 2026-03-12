@@ -580,8 +580,12 @@ func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 		var hole = PackedVector2Array([Vector2(r.position.x, r.position.y), Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y), Vector2(r.position.x, r.end.y)])
 		poly.add_outline(hole)
 	
-	# This generates the actual mesh data from the outlines
-	poly.make_polygons_from_outlines()
+	# Modern baking approach: avoids deprecated make_polygons_from_outlines
+	# We use the NavigationServer to bake the source outlines into valid polygons
+	var source_geometry = NavigationMeshSourceGeometryData2D.new()
+	NavigationServer2D.parse_source_geometry_data(poly, source_geometry, nav_region)
+	NavigationServer2D.bake_from_source_geometry_data(poly, source_geometry)
+	
 	nav_region.navigation_polygon = poly
 	# Force immediate sync
 	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)

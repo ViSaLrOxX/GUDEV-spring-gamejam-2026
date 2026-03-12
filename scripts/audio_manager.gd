@@ -11,11 +11,11 @@ func _ready() -> void:
 func _load_sounds() -> void:
 	var sfx_path = "res://assets/sound_effects/"
 	var to_load = {
-		"shoot": "laserShoot.wav",
+		"shoot": "laserShoot.mp3",
 		"hit": "hitHurt.wav",
-		"pickup": "pickup.wav",
-		"click": "click.wav",
-		"explosion": "explosion.wav"
+		"pickup": "pickup.mp3",
+		"click": "click.mp3",
+		"explosion": "explosion.mp3"
 	}
 	
 	for key in to_load:
