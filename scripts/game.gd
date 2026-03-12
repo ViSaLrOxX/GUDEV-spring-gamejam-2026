@@ -205,7 +205,9 @@ func _clear_static_nodes() -> void:
 func _start_level(level: int, open_shop: bool = true) -> void:
 	if _transition_tween: _transition_tween.kill(); _transition_tween = null
 
-	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true; Engine.time_scale = 0.0 
+	current_level = level; cores_collected = 0; coins_collected = 0; enemies_killed_in_level = 0; portal_unlocked = false; game_active = true; _is_dying = false; is_waiting_to_start = true; _transition_lock_timer = TRANSITION_DELAY; _was_moving_on_load = true
+	# Ensure time_scale is 1.0 so UI animations/fades work
+	Engine.time_scale = 1.0 
 	_is_transitioning = false; target_time_scale = SLOW_TIME_SCALE; _ghost_check_timer = 2.0
 	_target_zoom = BASE_ZOOM; _shot_heat_multiplier = 0
 	if camera: camera.zoom = Vector2.ONE * BASE_ZOOM
@@ -374,23 +376,22 @@ func _trigger_game_over() -> void:
 	game_active = false; Engine.time_scale = 1.0; _show_game_over_screen()
 
 func _open_shop() -> void:
-	is_shop_open = true
+	is_shop_open = true; Engine.time_scale = 1.0 # Ensure tweens run
 	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
 	
 	var tech_cyan = Color(0.2, 0.8, 1.0)
 	var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
 	
-	# Full screen dim
 	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
 	
-	# Main Panel
 	var panel = PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER); panel.custom_minimum_size = Vector2(850, 600); panel.pivot_offset = Vector2(425, 300); canvas.add_child(panel)
 	
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
+	p_style.content_margin_left = 40; p_style.content_margin_right = 40; p_style.content_margin_top = 40; p_style.content_margin_bottom = 40
 	panel.add_theme_stylebox_override("panel", p_style)
 	
 	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 25); panel.add_child(vbox)
-	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); vbox.offset_left = 40; vbox.offset_top = 40; vbox.offset_right = -40; vbox.offset_bottom = -40
+	# No manual offsets on vbox, container handles it now with content_margins
 
 	# Header
 	var title = Label.new(); title.text = "/// UPGRADE_TERMINAL_V4.6"; title.add_theme_font_size_override("font_size", 42); title.add_theme_color_override("font_color", tech_cyan * 2.0); title.add_theme_color_override("font_outline_color", Color.BLACK); title.add_theme_constant_override("outline_size", 8); vbox.add_child(title)
