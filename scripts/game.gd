@@ -191,10 +191,11 @@ func _process(delta: float) -> void:
 		return
 	if not game_active: return
 
-	# Ghost enemy safety check
-	if not _is_transitioning and get_tree().get_nodes_in_group("enemies").size() == 0:
-		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
-		return
+	# Ghost enemy safety check - Only after level has started
+	if not _is_transitioning and total_enemies_in_level > 0:
+		if get_tree().get_nodes_in_group("enemies").size() == 0:
+			_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
+			return
 
 	total_time_elapsed += real_delta; time_remaining -= delta 
 	if _is_dying:
