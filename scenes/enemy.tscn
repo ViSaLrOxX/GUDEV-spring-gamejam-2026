@@ -8,13 +8,21 @@ height = 24.0
 
 [node name="Enemy" type="CharacterBody2D"]
 collision_layer = 2
-collision_mask = 1
+collision_mask = 7
 script = ExtResource("1_script")
 enemy_type = "melee"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+rotation = 1.5708
 shape = SubResource("CapsuleShape2D_enemy")
 
 [node name="Polygon2D" type="Polygon2D" parent="."]
 color = Color(1, 0.2, 0.2, 1)
-polygon = PackedVector2Array(0, -16, 12, 8, 0, 3, -12, 8)
+polygon = PackedVector2Array(12, 0, -12, 12, -7, 0, -12, -12)
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+path_desired_distance = 10.0
+target_desired_distance = 10.0
+path_max_distance = 50.0
+avoidance_enabled = true
+radius = 15.0

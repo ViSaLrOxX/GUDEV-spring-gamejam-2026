@@ -21,4 +21,4 @@ polygon = PackedVector2Array(0, -14, 10, -10, 14, 0, 10, 10, 0, 14, -10, 10, -14
 color = Color(0.8, 1.0, 1.0, 0.9)
 polygon = PackedVector2Array(0, -6, 4, -4, 6, 0, 4, 4, 0, 6, -4, 4, -6, 0, -4, -4)
 
-[connection signal="body_entered" from="." method="_on_body_entered"]
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]

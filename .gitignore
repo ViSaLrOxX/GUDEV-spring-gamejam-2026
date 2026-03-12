@@ -1,8 +1,13 @@
+# Godot-specific ignores
 .godot/
-*.uid
-*.import
-android/
-ios/
 *.tmp
-*.remap
-*.gdc
+*.import
+*.log
+*.bak
+*.old
+*.sav
+*.cfg
+*.txt
+*.avi
+gamejam.tar.gz
+# (Exclude specific Godot config files if needed, but .godot/ is the big one)
