@@ -83,9 +83,10 @@ var dynamic_entities: Node2D = null
 var dynamic_walls: Node2D = null
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS # Script always runs
 	add_to_group("game")
-	dynamic_entities = Node2D.new(); add_child(dynamic_entities)
-	dynamic_walls = Node2D.new(); add_child(dynamic_walls)
+	dynamic_entities = Node2D.new(); dynamic_entities.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_entities)
+	dynamic_walls = Node2D.new(); dynamic_walls.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_walls)
 	# _setup_screen_shader()
 	_setup_overscreen_hud()
 	_clear_static_nodes()
@@ -376,22 +377,18 @@ func _trigger_game_over() -> void:
 	game_active = false; Engine.time_scale = 1.0; _show_game_over_screen()
 
 func _open_shop() -> void:
-	is_shop_open = true
-	get_tree().paused = true # Pause the game world
+	if is_shop_open: return
+	is_shop_open = true; get_tree().paused = true
 	
 	var canvas = CanvasLayer.new(); canvas.name = "ShopUI"; canvas.layer = 20; add_child(canvas)
-	canvas.process_mode = Node.PROCESS_MODE_ALWAYS # Ensure UI processes while paused
+	canvas.process_mode = Node.PROCESS_MODE_ALWAYS
 	
-	var tech_cyan = Color(0.2, 0.8, 1.0)
-	var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
-	
+	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
 	var bg_rect = ColorRect.new(); bg_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); bg_rect.color = Color(0, 0, 0, 0.6); canvas.add_child(bg_rect)
 	
 	var panel = PanelContainer.new(); canvas.add_child(panel)
 	panel.custom_minimum_size = Vector2(850, 600)
-	# Correct centering in Godot 4
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -425; panel.offset_top = -300; panel.offset_right = 425; panel.offset_bottom = 300
+	panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	panel.pivot_offset = Vector2(425, 300)
 	
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
@@ -438,14 +435,13 @@ func _open_shop() -> void:
 func _buy_upgrade(type: String, cost: int, info_label: Label, max_slots: int) -> void:
 	if inventory.size() >= max_slots: _show_big_bonus_message("SLOTS FULL!"); return
 	if total_coins_collected >= cost:
-		total_coins_collected -= cost; inventory.append(type); _update_ui(); info_label.text = "SLOTS USED: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; _show_big_bonus_message("ACQUIRED: " + type)
+		total_coins_collected -= cost; inventory.append(type); _update_ui(); info_label.text = "STORAGE: %d / %d  |  CREDITS: %d" % [inventory.size(), max_slots, total_coins_collected]; _show_big_bonus_message("ACQUIRED: " + type)
 	else: _show_big_bonus_message("INSUFFICIENT CREDITS")
 
 func _close_shop() -> void:
 	var shop = get_node_or_null("ShopUI"); if shop: shop.queue_free()
-	is_shop_open = false; get_tree().paused = false
-	_transition_lock_timer = TRANSITION_DELAY
-	# Reset state to waiting for player movement
+	is_shop_open = false; get_tree().paused = false; _last_real_ms = Time.get_ticks_msec()
+	_transition_lock_timer = 0.2 # Reduced delay
 	is_waiting_to_start = true; _was_moving_on_load = true; Engine.time_scale = 0.0; target_time_scale = SLOW_TIME_SCALE
 	shop_hint_label.visible = true; shop_hint_label.text = "MOVE TO INITIATE"
 
@@ -514,7 +510,7 @@ func _update_ui() -> void:
 	if level_label: level_label.text = "ROUND %02d" % current_level
 	if enemies_remaining_label: enemies_remaining_label.text = "THREATS: %d / %d" % [total_enemies_in_level - enemies_killed_in_level, total_enemies_in_level]
 	if coins_bank_label: coins_bank_label.text = "%04d" % total_coins_collected
-	if inventory_label: inventory_label.text = "SLOTS: %d / %d" % [inventory.size(), int(1 + floor(current_level / 10.0))]
+	if inventory_label: inventory_label.text = "STORAGE: %d / %d" % [inventory.size(), int(1 + floor(current_level / 10.0))]
 	if shop_hint_label: shop_hint_label.visible = is_waiting_to_start and not is_shop_open
 	if combo_label: combo_label.visible = combo_count > 1; combo_label.text = "COMBO ×%d" % combo_count
 
