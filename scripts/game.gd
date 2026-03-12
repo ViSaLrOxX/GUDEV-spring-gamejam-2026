@@ -100,30 +100,81 @@ func _setup_overscreen_hud() -> void:
 	var ui = $UI
 	for child in ui.get_children(): child.queue_free()
 	var root = Control.new(); root.name = "HudRoot"; root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); ui.add_child(root)
-	var frame_color = Color(0.2, 0.8, 1.0, 0.6)
+	
+	# Global Styles
+	var tech_cyan = Color(0.2, 0.8, 1.0)
+	var tech_bg = Color(0.02, 0.05, 0.08, 0.7)
+	
+	var base_style = StyleBoxFlat.new()
+	base_style.bg_color = tech_bg
+	base_style.border_width_left = 2; base_style.border_width_top = 2
+	base_style.border_color = tech_cyan * 1.5
+	base_style.skew = Vector2(0.1, 0.0)
+	base_style.corner_radius_top_left = 4
+	base_style.shadow_color = Color(0, 0, 0, 0.5)
+	base_style.shadow_size = 4
+
+	# 1. Corner Decals (Industrial Look)
+	var decal_color = tech_cyan * 0.8
 	for corner in [Control.PRESET_TOP_LEFT, Control.PRESET_TOP_RIGHT, Control.PRESET_BOTTOM_LEFT, Control.PRESET_BOTTOM_RIGHT]:
 		var c_box = Control.new(); c_box.set_anchors_and_offsets_preset(corner); root.add_child(c_box)
-		var h_line = ColorRect.new(); h_line.color = frame_color; h_line.custom_minimum_size = Vector2(120, 4); c_box.add_child(h_line)
-		var v_line = ColorRect.new(); v_line.color = frame_color; v_line.custom_minimum_size = Vector2(4, 120); c_box.add_child(v_line)
-		if corner == Control.PRESET_TOP_RIGHT: h_line.position = Vector2(-120, 0)
-		elif corner == Control.PRESET_BOTTOM_LEFT: v_line.position = Vector2(0, -120)
-		elif corner == Control.PRESET_BOTTOM_RIGHT: h_line.position = Vector2(-120, 0); v_line.position = Vector2(0, -120)
-	var bg_style = StyleBoxFlat.new(); bg_style.bg_color = Color(0, 0, 0, 0.9); bg_style.border_width_left = 2; bg_style.border_width_top = 2; bg_style.border_width_right = 2; bg_style.border_width_bottom = 2; bg_style.border_color = Color(0.3, 0.3, 0.5); bg_style.skew = Vector2(0.2, 0.0)
-	var fg_time = StyleBoxFlat.new(); fg_time.bg_color = Color(0.2, 1.0, 0.8) * 2.0; fg_time.skew = Vector2(0.2, 0.0)
-	var tl = VBoxContainer.new(); tl.position = Vector2(50, 50); tl.custom_minimum_size = Vector2(450, 0); root.add_child(tl)
-	time_bar = ProgressBar.new(); time_bar.custom_minimum_size = Vector2(450, 24); time_bar.show_percentage = false; time_bar.add_theme_stylebox_override("background", bg_style); time_bar.add_theme_stylebox_override("fill", fg_time); tl.add_child(time_bar)
-	inventory_label = Label.new(); inventory_label.add_theme_font_size_override("font_size", 20); inventory_label.add_theme_color_override("font_color", Color.WHITE * 2.0); tl.add_child(inventory_label)
-	var tr_box = VBoxContainer.new(); tr_box.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_box.offset_left = -450; tr_box.offset_top = 50; tr_box.offset_right = -50; tr_box.alignment = BoxContainer.ALIGNMENT_END; root.add_child(tr_box)
-	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 64); level_label.add_theme_color_override("font_color", Color.WHITE * 2.0); tr_box.add_child(level_label)
-	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 24); enemies_remaining_label.add_theme_color_override("font_color", Color.RED * 3.0); tr_box.add_child(enemies_remaining_label)
-	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(300, 16); progress_bar.show_percentage = false; progress_bar.add_theme_stylebox_override("background", bg_style); var fg_core = fg_time.duplicate(); fg_core.bg_color = Color(1.0, 0.4, 0.8) * 3.0; progress_bar.add_theme_stylebox_override("fill", fg_core); tr_box.add_child(progress_bar)
-	var bl = VBoxContainer.new(); bl.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); bl.offset_left = 50; bl.offset_bottom = -50; bl.offset_top = -120; root.add_child(bl)
-	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(350, 16); cooldown_bar.show_percentage = false; cooldown_bar.add_theme_stylebox_override("background", bg_style); var fg_ammo = fg_time.duplicate(); fg_ammo.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("fill", fg_ammo); bl.add_child(cooldown_bar)
-	var br = VBoxContainer.new(); br.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br.offset_left = -450; br.offset_bottom = -50; br.offset_top = -150; br.offset_right = -50; br.alignment = BoxContainer.ALIGNMENT_END; root.add_child(br)
-	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 72); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); br.add_child(coins_bank_label)
-	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 80); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -180; root.add_child(combo_label)
-	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 48); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
+		var h_line = ColorRect.new(); h_line.color = decal_color; h_line.custom_minimum_size = Vector2(60, 2); c_box.add_child(h_line)
+		var v_line = ColorRect.new(); v_line.color = decal_color; v_line.custom_minimum_size = Vector2(2, 60); c_box.add_child(v_line)
+		var dot = ColorRect.new(); dot.color = tech_cyan * 2.5; dot.custom_minimum_size = Vector2(6, 6); c_box.add_child(dot)
+		
+		if corner == Control.PRESET_TOP_LEFT: dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_TOP_RIGHT: h_line.position = Vector2(-60, 0); dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_BOTTOM_LEFT: v_line.position = Vector2(0, -60); dot.position = Vector2(-3, -3)
+		elif corner == Control.PRESET_BOTTOM_RIGHT: h_line.position = Vector2(-60, 0); v_line.position = Vector2(0, -60); dot.position = Vector2(-3, -3)
+
+	# 2. Time/System Panel (Top Left)
+	var tl_panel = PanelContainer.new(); tl_panel.position = Vector2(40, 40); tl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tl_panel)
+	var tl_vbox = VBoxContainer.new(); tl_vbox.custom_minimum_size = Vector2(400, 0); tl_vbox.add_theme_constant_override("separation", 5); tl_panel.add_child(tl_vbox)
+	
+	var time_header = Label.new(); time_header.text = "[ SYSTEM_STABILITY ]"; time_header.add_theme_font_size_override("font_size", 14); time_header.modulate = tech_cyan * 0.7; tl_vbox.add_child(time_header)
+	
+	time_bar = ProgressBar.new(); time_bar.custom_minimum_size = Vector2(0, 28); time_bar.show_percentage = false; tl_vbox.add_child(time_bar)
+	var bar_bg = base_style.duplicate(); bar_bg.bg_color = Color(0,0,0,0.4); bar_bg.border_width_left = 1; bar_bg.border_width_top = 1; bar_bg.border_width_right = 1; bar_bg.border_width_bottom = 1; bar_bg.border_color = tech_cyan * 0.4
+	var bar_fg = base_style.duplicate(); bar_fg.bg_color = tech_cyan * 2.0; bar_fg.border_width_left = 0; bar_fg.border_width_top = 0
+	time_bar.add_theme_stylebox_override("background", bar_bg); time_bar.add_theme_stylebox_override("fill", bar_fg)
+	
+	inventory_label = Label.new(); inventory_label.text = "NODES: NULL"; inventory_label.add_theme_font_size_override("font_size", 16); inventory_label.modulate = tech_cyan * 1.5; tl_vbox.add_child(inventory_label)
+
+	# 3. Threat/Round Panel (Top Right)
+	var tr_panel = PanelContainer.new(); tr_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_panel.offset_left = -440; tr_panel.offset_top = 40; tr_panel.offset_right = -40; tr_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tr_panel)
+	var tr_vbox = VBoxContainer.new(); tr_vbox.alignment = BoxContainer.ALIGNMENT_END; tr_panel.add_child(tr_vbox)
+	
+	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 48); level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(level_label)
+	
+	enemies_remaining_label = Label.new(); enemies_remaining_label.add_theme_font_size_override("font_size", 20); enemies_remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(enemies_remaining_label)
+	
+	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(300, 12); progress_bar.show_percentage = false; tr_vbox.add_child(progress_bar)
+	var core_fg = bar_fg.duplicate(); core_fg.bg_color = Color(1.0, 0.4, 0.8) * 3.0; progress_bar.add_theme_stylebox_override("background", bar_bg); progress_bar.add_theme_stylebox_override("fill", core_fg)
+
+	# 4. Weapons/Heat Panel (Bottom Left)
+	var bl_panel = PanelContainer.new(); bl_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); bl_panel.offset_left = 40; bl_panel.offset_bottom = -40; bl_panel.offset_top = -100; bl_panel.add_theme_stylebox_override("panel", base_style); root.add_child(bl_panel)
+	var bl_vbox = VBoxContainer.new(); bl_vbox.custom_minimum_size = Vector2(300, 0); bl_panel.add_child(bl_vbox)
+	
+	var weapon_header = Label.new(); weapon_header.text = "[ PULSE_CAPACITOR ]"; weapon_header.add_theme_font_size_override("font_size", 14); weapon_header.modulate = tech_cyan * 0.7; bl_vbox.add_child(weapon_header)
+	
+	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(0, 14); cooldown_bar.show_percentage = false; bl_vbox.add_child(cooldown_bar)
+	var heat_fg = bar_fg.duplicate(); heat_fg.bg_color = Color(1.0, 0.8, 0.2) * 3.0; cooldown_bar.add_theme_stylebox_override("background", bar_bg); cooldown_bar.add_theme_stylebox_override("fill", heat_fg)
+
+	# 5. Economy Panel (Bottom Right)
+	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -440; br_panel.offset_bottom = -40; br_panel.offset_top = -120; br_panel.offset_right = -40; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
+	var br_vbox = VBoxContainer.new(); br_vbox.alignment = BoxContainer.ALIGNMENT_END; br_panel.add_child(br_vbox)
+	
+	var credit_header = Label.new(); credit_header.text = "CREDITS // UNSTABLE"; credit_header.add_theme_font_size_override("font_size", 14); credit_header.modulate = Color.GOLD * 0.7; br_vbox.add_child(credit_header)
+	
+	coins_bank_label = Label.new(); coins_bank_label.add_theme_font_size_override("font_size", 64); coins_bank_label.add_theme_color_override("font_color", Color.GOLD * 3.0); br_vbox.add_child(coins_bank_label)
+
+	# Combo/Shop/Fade
+	combo_label = Label.new(); combo_label.add_theme_font_size_override("font_size", 80); combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; combo_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM); combo_label.offset_top = -220; root.add_child(combo_label)
+	shop_hint_label = Label.new(); shop_hint_label.add_theme_font_size_override("font_size", 32); shop_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; shop_hint_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER); root.add_child(shop_hint_label)
 	fade_overlay = ColorRect.new(); fade_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); fade_overlay.color = Color(0, 0, 0, 0); ui.add_child(fade_overlay)
+
+	# Subtle Scanline Overlay
+	var scanline = ReferenceRect.new(); scanline.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); scanline.mouse_filter = Control.MOUSE_FILTER_IGNORE; scanline.border_color = Color(0.2, 0.8, 1.0, 0.05); scanline.border_width = 1.0; scanline.editor_only = false; root.add_child(scanline)
 
 func _clear_static_nodes() -> void:
 	for child in get_children():
