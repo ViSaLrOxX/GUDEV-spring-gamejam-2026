@@ -1,8 +1,8 @@
-extends Node
+extends SceneTree
 
-func _ready() -> void:
+func _init() -> void:
 	_run()
-	get_tree().quit()
+	quit()
 
 func _run() -> void:
 	var T := preload("res://tests/test_helpers.gd")
@@ -72,22 +72,52 @@ func _run() -> void:
 	T.expect_eq(int(1 + floor(1 / 3.0)), 1, "level 1 needs 1 core")
 	T.expect_eq(int(1 + floor(6 / 3.0)), 3, "level 6 needs 3 cores")
 
-	T.suite("Boss spawn every 5 rounds")
-	for lvl in [5, 10, 15, 20]:
-		T.expect_true(lvl % 5 == 0, "boss spawns at round %d" % lvl)
-	for lvl in [1, 2, 3, 4, 6, 7]:
-		T.expect_false(lvl % 5 == 0, "no boss at round %d" % lvl)
+	T.suite("Map scaling logic")
+	# Level 1
+	var level1 := 1
+	var cores1 := int(1 + floor(level1 / 3.0))
+	var enemies1 := level1 * 2
+	var walls1 := 5 + level1
+	var coins1 := 1 + int(level1 / 2.0)
+	var items1 := enemies1 + walls1 + cores1 + coins1 + 10
+	var area1_req := items1 * 35000.0
+	var w1 := 700.0 + (level1 - 1) * 30.0
+	var h1 := 500.0 + (level1 - 1) * 22.5
+	var a1 := w1 * h1
+	if a1 < area1_req:
+		var f := sqrt(area1_req / a1)
+		w1 *= f; h1 *= f; a1 = w1 * h1
+	T.expect_gt(a1, area1_req - 1.0, "Level 1 area sufficient")
 
-	T.suite("Boss HP scaling")
-	for lvl in [5, 10, 15]:
-		var boss_hp := 2 + int(lvl / 5)
-		T.expect_gt(boss_hp, 2, "boss HP increases with level (level=%d)" % lvl)
-	T.expect_eq(2 + int(5 / 5), 3, "boss at round 5 has 3 HP")
-	T.expect_eq(2 + int(10 / 5), 4, "boss at round 10 has 4 HP")
+	# Level 50 (Stress test)
+	var level50 := 50
+	var cores50 := int(1 + floor(level50 / 3.0))
+	var enemies50 := level50 * 2
+	var walls50 := 5 + level50
+	var coins50 := 1 + int(level50 / 2.0)
+	var items50 := enemies50 + walls50 + cores50 + coins50 + 10
+	var area50_req := items50 * 35000.0
+	var w50 := 700.0 + (level50 - 1) * 30.0
+	var h50 := 500.0 + (level50 - 1) * 22.5
+	var a50 := w50 * h50
+	if a50 < area50_req:
+		var f := sqrt(area50_req / a50)
+		w50 *= f; h50 *= f; a50 = w50 * h50
+	T.expect_gt(a50, area50_req - 1.0, "Level 50 area sufficient")
+	T.expect_gt(w50, 2000.0, "Level 50 map significantly larger")
 
-	T.suite("Time warp pickup - duration constant")
-	var WARP_DURATION := 3.0
-	T.expect_eq(WARP_DURATION, 3.0, "warp lasts 3 real seconds")
-	T.expect_gt(WARP_DURATION, 0.0, "warp duration is positive")
+	T.suite("Enemy count logic")
+	# Level 1
+	var total_enemies1 := 0
+	var num_enemies1 := 1 * 2
+	total_enemies1 += num_enemies1
+	T.expect_eq(total_enemies1, 2, "Level 1 has 2 enemies")
+
+	# Level 5 (Boss)
+	var total_enemies5 := 0
+	if 5 % 5 == 0: total_enemies5 += 1
+	var num_enemies5 := 5 * 2
+	total_enemies5 += num_enemies5
+	T.expect_eq(total_enemies5, 11, "Level 5 has 11 enemies (1 boss + 10 regular)")
 
 	T.summary()

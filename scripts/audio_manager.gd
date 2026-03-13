@@ -32,13 +32,13 @@ var _pool = []
 var _next_player = 0
 
 var _master_volume = 1.0
-var _music_volume = 1.0
+var _music_volume = 0.2
 var _sfx_volumes = {
-	"shoot": 1.0,
-	"hit": 1.0,
-	"pickup": 1.0,
-	"click": 1.0,
-	"explosion": 1.0
+	"shoot": 0.6,
+	"hit": 0.6,
+	"pickup": 0.6,
+	"click": 0.6,
+	"explosion": 0.1
 }
 var _music_player : AudioStreamPlayer
 
@@ -58,7 +58,7 @@ func play_music(file_name: String) -> void:
 	if FileAccess.file_exists(path):
 		var stream = load(path)
 		_music_player.stream = stream
-		_music_player.volume_db = linear_to_db(_music_volume * _master_volume * 0.6)
+		_music_player.volume_db = linear_to_db(_music_volume * _master_volume)
 		_music_player.play()
 	else:
 		print("[AudioManager] Music file not found: ", path)
@@ -81,7 +81,7 @@ func get_sfx_volume(sound_name: String) -> float: return _sfx_volumes.get(sound_
 
 func _update_all_volumes() -> void:
 	if _music_player:
-		_music_player.volume_db = linear_to_db(_music_volume * _master_volume * 0.6)
+		_music_player.volume_db = linear_to_db(_music_volume * _master_volume)
 
 func play_sfx(sound_name: String, pitch_rng: float = 0.1) -> void:
 	if not sounds.has(sound_name) or sounds[sound_name] == null:

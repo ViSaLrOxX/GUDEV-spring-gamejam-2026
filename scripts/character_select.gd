@@ -31,9 +31,9 @@ func _build_ui() -> void:
 	title.offset_bottom = 100.0
 	add_child(title)
 
-	var chars := CharacterData.get_all()
+	var chars: Array = CharacterData.get_all()
 
-	var card_row := HBoxContainer.new()
+	var card_row: HBoxContainer = HBoxContainer.new()
 	card_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	card_row.offset_top    = 110.0
 	card_row.offset_bottom = 280.0
@@ -44,10 +44,10 @@ func _build_ui() -> void:
 	add_child(card_row)
 
 	for i in range(chars.size()):
-		var c      := chars[i]
-		var card   := Button.new()
+		var c: Dictionary = chars[i]
+		var card: Button = Button.new()
 		card.custom_minimum_size = Vector2(160, 160)
-		var style  := StyleBoxFlat.new()
+		var style: StyleBoxFlat = StyleBoxFlat.new()
 		style.bg_color       = Color(0.08, 0.08, 0.12)
 		style.border_color   = c["colour"]
 		style.border_width_left = 2; style.border_width_top = 2
@@ -132,9 +132,9 @@ func _build_ui() -> void:
 	_refresh_cards()
 
 func _refresh_cards() -> void:
-	var chars := CharacterData.get_all()
+	var chars: Array = CharacterData.get_all()
 	for i in range(_cards.size()):
-		var style := StyleBoxFlat.new()
+		var style: StyleBoxFlat = StyleBoxFlat.new()
 		style.bg_color = Color(0.16, 0.16, 0.22) if i == _selected_index else Color(0.08, 0.08, 0.12)
 		style.border_color = chars[i]["colour"] * (3.0 if i == _selected_index else 1.0)
 		style.border_width_left = 3 if i == _selected_index else 2
@@ -146,8 +146,8 @@ func _refresh_cards() -> void:
 		_cards[i].add_theme_stylebox_override("hover",  style)
 
 func _refresh_detail() -> void:
-	var chars := CharacterData.get_all()
-	var c     := chars[_selected_index]
+	var chars: Array = CharacterData.get_all()
+	var c: Dictionary = chars[_selected_index]
 	_detail_name.text  = c["name"]
 	_detail_name.add_theme_color_override("font_color", c["colour"] * 3.0)
 	_detail_title.text = c["title"]
@@ -156,8 +156,8 @@ func _refresh_detail() -> void:
 	_detail_desc.text  = c["ability_desc"]
 
 func _on_confirm() -> void:
-	var chars  := CharacterData.get_all()
-	var gs     := get_node_or_null("/root/GameState")
+	var chars: Array = CharacterData.get_all()
+	var gs: Node = get_node_or_null("/root/GameState")
 	if gs:
 		gs.selected_character = chars[_selected_index]["id"]
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
