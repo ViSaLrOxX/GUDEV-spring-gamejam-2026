@@ -5,39 +5,39 @@ func _ready() -> void:
 	get_tree().quit()
 
 func _run() -> void:
-	var T    := preload("res://tests/test_helpers.gd")
-	var CD   := preload("res://scripts/character_data.gd")
+	var T: GDScript = preload("res://tests/test_helpers.gd")
+	var CD: GDScript = preload("res://scripts/character_data.gd")
 
 	T.suite("CharacterData - all 6 characters exist")
-	var all := CD.get_all()
+	var all: Array = CD.get_all()
 	T.expect_eq(all.size(), 6, "6 characters defined")
-	var ids := all.map(func(c): return c["id"])
+	var ids: Array = all.map(func(c): return c["id"])
 	for expected_id in ["VECTOR", "GLITCH", "PHANTOM", "PURGE", "ECHO", "SIGNAL"]:
 		T.expect_true(ids.has(expected_id), "%s exists" % expected_id)
 
 	T.suite("CharacterData - get_by_id returns correct character")
 	for char_id in ["VECTOR", "GLITCH", "PHANTOM", "PURGE", "ECHO", "SIGNAL"]:
-		var c := CD.get_by_id(char_id)
+		var c: Dictionary = CD.get_by_id(char_id)
 		T.expect_eq(c["id"], char_id, "get_by_id(%s) returns correct" % char_id)
 
 	T.suite("CharacterData - get_by_id unknown id falls back to VECTOR")
-	var fallback := CD.get_by_id("INVALID_ID")
+	var fallback: Dictionary = CD.get_by_id("INVALID_ID")
 	T.expect_eq(fallback["id"], "VECTOR", "unknown id returns VECTOR")
 
 	T.suite("CharacterData - all characters have required fields")
 	var required_fields := ["id", "name", "title", "colour", "ability_name", "ability_desc", "ability_type", "speed_mult", "enemy_speed_mult", "backstory"]
-	for c in all:
+	for c: Dictionary in all:
 		for field in required_fields:
 			T.expect_true(c.has(field), "%s has field '%s'" % [c["id"], field])
 
 	T.suite("CharacterData - speed multipliers are valid")
-	for c in all:
+	for c: Dictionary in all:
 		T.expect_gt(c["speed_mult"], 0.0, "%s speed_mult > 0" % c["id"])
 		T.expect_gt(c["enemy_speed_mult"], 0.0, "%s enemy_speed_mult > 0" % c["id"])
-	var glitch := CD.get_by_id("GLITCH")
+	var glitch: Dictionary = CD.get_by_id("GLITCH")
 	T.expect_gt(glitch["speed_mult"], 1.0, "GLITCH is faster than normal")
 	T.expect_gt(glitch["enemy_speed_mult"], 1.0, "GLITCH enemies are faster")
-	var phantom := CD.get_by_id("PHANTOM")
+	var phantom: Dictionary = CD.get_by_id("PHANTOM")
 	T.expect_lte(phantom["enemy_speed_mult"], 1.0, "PHANTOM enemies are slower or normal")
 
 	T.suite("CharacterData - ability types are valid")

@@ -183,7 +183,18 @@ func _melee_attack() -> void:
 	_flash(Color.RED)
 
 func _shoot_at_player() -> void:
-	if not _projectile_scene: return
+	if not _projectile_scene or not _player: return
+	
+	# Only turrets can shoot through walls and across the entire map
+	if enemy_type != "turret":
+		var space_state = get_world_2d().direct_space_state
+		var query = PhysicsRayQueryParameters2D.create(global_position, _player.global_position)
+		query.collision_mask = 4 # Only check for walls (layer 3)
+		var result = space_state.intersect_ray(query)
+		if result:
+			# Hit a wall, don't shoot
+			return
+
 	var dir = global_position.direction_to(_player.global_position)
 	var proj = _projectile_scene.instantiate() as Node2D
 	get_parent().add_child(proj)

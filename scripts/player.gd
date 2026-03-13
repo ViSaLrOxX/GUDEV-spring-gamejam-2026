@@ -3,12 +3,14 @@ extends CharacterBody2D
 const CharacterData = preload("res://scripts/character_data.gd")
 
 var move_speed       : float = 130.0
+var acceleration     : float = 1200.0
+var friction         : float = 800.0
 var shoot_cooldown   : float = 0.3
 var bullet_speed     : float = 600.0
-var dash_speed       : float = 600.0
+var dash_speed       : float = 800.0 # Increased for more impact
 var dash_duration    : float = 0.15
 var dash_cost        : float = 3.0
-var dash_cooldown    : float = 1.0
+var dash_cooldown    : float = 0.8 # Slightly reduced for better flow
 
 var _shoot_timer     : float = 0.0
 var _is_moving       : bool  = false
@@ -27,6 +29,9 @@ var _free_shoot_timer : float = 0.0
 var _char_colour      : Color = Color(0.2, 0.8, 1.0)
 var _distance_moved   : float = 0.0
 
+var _ghost_timer      : float = 0.0
+const GHOST_INTERVAL  : float = 0.06
+
 var _bullet_scene    : PackedScene = null
 var _game            : Node2D = null
 
@@ -35,13 +40,15 @@ func _ready() -> void:
 	_game = get_tree().get_first_node_in_group("game")
 	_bullet_scene = load("res://scenes/bullet.tscn")
 
-	var gs      := get_node_or_null("/root/GameState")
-	var char_id := gs.selected_character if gs else "VECTOR"
-	var cdata   := CharacterData.get_by_id(char_id)
+	var gs: Node  = get_node_or_null("/root/GameState")
+	var char_id: String = gs.selected_character if gs else "VECTOR"
+	var cdata: Dictionary = CharacterData.get_by_id(char_id)
 
 	_ability_type = cdata["ability_type"]
 	_char_colour  = cdata["colour"]
 	move_speed   *= cdata["speed_mult"]
+	acceleration *= cdata["speed_mult"]
+	friction     *= cdata["speed_mult"]
 	scale = Vector2(1.1, 1.1)
 
 	var poly := get_node_or_null("Polygon2D")
@@ -63,12 +70,22 @@ func _physics_process(delta: float) -> void:
 	_dash_cd_timer -= delta
 	if _is_dashing:
 		_dash_timer -= delta
-		velocity = _dash_dir * dash_speed
+		# Exponential decay for dash speed to feel more organic
+		var weight = _dash_timer / dash_duration
+		velocity = _dash_dir * dash_speed * (0.4 + 0.6 * weight)
+		_tick_ghost(delta, true)
 		if _dash_timer <= 0.0:
 			_is_dashing      = false
 			_dash_invincible = false
+			# Carry over some dash momentum into regular movement
+			velocity = _dash_dir * move_speed * 1.2
 	else:
-		velocity = dir * move_speed
+		if _is_moving:
+			velocity = velocity.move_toward(dir * move_speed, acceleration * delta)
+			_tick_ghost(delta, false)
+		else:
+			velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+			
 		if Input.is_action_just_pressed("dash") and _dash_cd_timer <= 0.0 and _is_moving:
 			_start_dash(dir)
 
@@ -90,26 +107,34 @@ func _physics_process(delta: float) -> void:
 	if _ability_ready and Input.is_action_just_pressed("ability"):
 		_trigger_ability()
 
+func enemy_killed_reward() -> void:
+	if _ability_type == "bullet_time":
+		ability_charge = minf(ability_charge + 20.0, ability_max)
+		if _game and _game.has_method("update_ability_bar"):
+			_game.update_ability_bar(ability_charge, ability_max, ability_charge >= ability_max, _char_colour)
+
 func _tick_ability(delta: float) -> void:
 	if _ability_type == "none":
 		return
 	match _ability_type:
 		"bullet_time":
-			if _is_shooting or _is_moving:
-				ability_charge = minf(ability_charge + delta * 12.0, ability_max)
+			# Now fills via enemy_killed_reward()
+			pass
 		"invisibility":
+			# Fills via take_damage_on_ability_fill()
 			pass
 		"wipeout":
 			if _is_moving:
+				# 0.05 is too slow for 2^n enemies, increasing to 0.1
 				_distance_moved += velocity.length() * delta
-				ability_charge = minf(_distance_moved * 0.05, ability_max)
+				ability_charge = minf(_distance_moved * 0.1, ability_max)
 		"restore":
 			if _game:
-				var t := _game.get("time_remaining") if _game.get("time_remaining") != null else 60.0
+				var t: float = _game.get("time_remaining") if _game.get("time_remaining") != null else 60.0
 				if t < 20.0:
 					ability_charge = minf(ability_charge + delta * 18.0, ability_max)
 		"free_shoot":
-			ability_charge = minf(ability_charge + delta * 5.0, ability_max)
+			ability_charge = minf(ability_charge + delta * 8.0, ability_max)
 
 	_ability_ready = ability_charge >= ability_max
 	if _game and _game.has_method("update_ability_bar"):
@@ -162,6 +187,50 @@ func _start_dash(dir: Vector2) -> void:
 	if _game:
 		_game.subtract_time(dash_cost)
 	_tween_flash(Color(0.5, 0.8, 1.0))
+	_spawn_dash_burst()
+
+func _tick_ghost(delta: float, dashing: bool) -> void:
+	_ghost_timer -= delta
+	var interval = GHOST_INTERVAL * 0.4 if dashing else GHOST_INTERVAL
+	if _ghost_timer <= 0.0:
+		_ghost_timer = interval
+		_spawn_ghost(dashing)
+
+func _spawn_ghost(dashing: bool) -> void:
+	var ghost = Polygon2D.new()
+	var source = get_node_or_null("Polygon2D")
+	if not source: return
+	ghost.polygon = source.polygon
+	ghost.global_position = global_position
+	ghost.global_rotation = global_rotation
+	ghost.scale = scale
+	ghost.color = _char_colour * (3.0 if dashing else 1.5)
+	ghost.z_index = z_index - 1
+	# Add to scene parent to stay fixed in world space
+	get_parent().add_child(ghost)
+	
+	var tw = create_tween().set_parallel(true)
+	tw.tween_property(ghost, "modulate:a", 0.0, 0.25 if dashing else 0.15)
+	tw.tween_property(ghost, "scale", scale * 0.8, 0.2)
+	tw.finished.connect(ghost.queue_free)
+
+func _spawn_dash_burst() -> void:
+	for i in range(8):
+		var ang = (PI * 2 / 8) * i
+		var dir = Vector2.from_angle(ang)
+		var ghost = Polygon2D.new()
+		var source = get_node_or_null("Polygon2D")
+		if not source: continue
+		ghost.polygon = source.polygon
+		ghost.global_position = global_position
+		ghost.scale = scale * 0.4
+		ghost.color = _char_colour * 2.0
+		get_parent().add_child(ghost)
+		var tw = create_tween().set_parallel(true)
+		tw.tween_property(ghost, "global_position", global_position + dir * 60.0, 0.3)
+		tw.tween_property(ghost, "modulate:a", 0.0, 0.3)
+		tw.tween_property(ghost, "scale", Vector2.ZERO, 0.3)
+		tw.finished.connect(ghost.queue_free)
 
 func _shoot() -> void:
 	if not _bullet_scene:

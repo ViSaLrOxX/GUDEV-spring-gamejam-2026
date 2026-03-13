@@ -134,8 +134,11 @@ func die() -> void:
 			get_parent().add_child(b)
 			b.global_position = global_position + Vector2(randf_range(-40, 40), randf_range(-40, 40))
 	if _game:
-		for i in range(reward_multiplier):
-			_game.enemy_killed()
+		# Count as one kill for the level wipeout progress
+		_game.enemy_killed(true)
+		# Add bonus rewards that don't count toward wipeout total
+		for i in range(reward_multiplier - 1):
+			_game.enemy_killed(false)
 	queue_free()
 
 func _flash(color: Color) -> void:
