@@ -7,10 +7,10 @@ var acceleration     : float = 1200.0
 var friction         : float = 800.0
 var shoot_cooldown   : float = 0.3
 var bullet_speed     : float = 600.0
-var dash_speed       : float = 800.0 # Increased for more impact
+var dash_speed       : float = 800.0
 var dash_duration    : float = 0.15
 var dash_cost        : float = 3.0
-var dash_cooldown    : float = 0.8 # Slightly reduced for better flow
+var dash_cooldown    : float = 0.8
 
 var _shoot_timer     : float = 0.0
 var _is_moving       : bool  = false
@@ -24,6 +24,7 @@ var _dash_invincible : bool  = false
 var ability_charge    : float = 0.0
 var ability_max       : float = 100.0
 var _ability_ready    : bool  = false
+var _was_ability_ready: bool  = false
 var _ability_type     : String = "none"
 var _free_shoot_timer : float = 0.0
 var _char_colour      : Color = Color(0.2, 0.8, 1.0)
@@ -70,14 +71,14 @@ func _physics_process(delta: float) -> void:
 	_dash_cd_timer -= delta
 	if _is_dashing:
 		_dash_timer -= delta
-		# Exponential decay for dash speed to feel more organic
+
 		var weight = _dash_timer / dash_duration
 		velocity = _dash_dir * dash_speed * (0.4 + 0.6 * weight)
 		_tick_ghost(delta, true)
 		if _dash_timer <= 0.0:
 			_is_dashing      = false
 			_dash_invincible = false
-			# Carry over some dash momentum into regular movement
+
 			velocity = _dash_dir * move_speed * 1.2
 	else:
 		if _is_moving:
@@ -85,7 +86,7 @@ func _physics_process(delta: float) -> void:
 			_tick_ghost(delta, false)
 		else:
 			velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
-			
+
 		if Input.is_action_just_pressed("dash") and _dash_cd_timer <= 0.0 and _is_moving:
 			_start_dash(dir)
 
@@ -108,7 +109,7 @@ func _physics_process(delta: float) -> void:
 		_trigger_ability()
 
 func enemy_killed_reward() -> void:
-	if _ability_type == "bullet_time":
+	if _ability_type == "bullet_time" or _ability_type == "time_heist":
 		ability_charge = minf(ability_charge + 20.0, ability_max)
 		if _game and _game.has_method("update_ability_bar"):
 			_game.update_ability_bar(ability_charge, ability_max, ability_charge >= ability_max, _char_colour)
@@ -118,14 +119,14 @@ func _tick_ability(delta: float) -> void:
 		return
 	match _ability_type:
 		"bullet_time":
-			# Now fills via enemy_killed_reward()
+
 			pass
 		"invisibility":
-			# Fills via take_damage_on_ability_fill()
+
 			pass
 		"wipeout":
 			if _is_moving:
-				# 0.05 is too slow for 2^n enemies, increasing to 0.1
+
 				_distance_moved += velocity.length() * delta
 				ability_charge = minf(_distance_moved * 0.1, ability_max)
 		"restore":
@@ -135,10 +136,23 @@ func _tick_ability(delta: float) -> void:
 					ability_charge = minf(ability_charge + delta * 18.0, ability_max)
 		"free_shoot":
 			ability_charge = minf(ability_charge + delta * 8.0, ability_max)
+		"time_heist":
+
+			pass
+		"stasis":
+
+			ability_charge = minf(ability_charge + delta * 4.0, ability_max)
+		"sync_blast":
+
+			pass
 
 	_ability_ready = ability_charge >= ability_max
 	if _game and _game.has_method("update_ability_bar"):
 		_game.update_ability_bar(ability_charge, ability_max, _ability_ready, _char_colour)
+	if _ability_ready and not _was_ability_ready:
+		_game._show_big_bonus_message("ABILITY READY  [ E ]")
+		_tween_flash(Color(1.0, 1.0, 0.3))
+	_was_ability_ready = _ability_ready
 
 func _trigger_ability() -> void:
 	ability_charge  = 0.0
@@ -162,11 +176,26 @@ func _trigger_ability() -> void:
 		"free_shoot":
 			_free_shoot_timer = 6.0
 			if _game:
-				_game._show_big_bonus_message("FREE FIRE — 6s")
+				_game._show_big_bonus_message("FREE FIRE 6s")
+		"time_heist":
+			if _game:
+				_game.trigger_bullet_time(6.0)
+				_game.add_time(20.0)
+				_game._show_big_bonus_message("TIME HEIST: +20s STOLEN")
+		"stasis":
+			if _game:
+				_game.trigger_stasis(3.0)
+		"sync_blast":
+			if _game:
+				_game.trigger_sync_blast()
 
 func take_damage_on_ability_fill(amount: float) -> void:
 	if _ability_type == "invisibility":
 		ability_charge = minf(ability_charge + amount * 4.5, ability_max)
+		if _game and _game.has_method("update_ability_bar"):
+			_game.update_ability_bar(ability_charge, ability_max, ability_charge >= ability_max, _char_colour)
+	elif _ability_type == "sync_blast":
+		ability_charge = minf(ability_charge + amount * 6.0, ability_max)
 		if _game and _game.has_method("update_ability_bar"):
 			_game.update_ability_bar(ability_charge, ability_max, ability_charge >= ability_max, _char_colour)
 
@@ -206,9 +235,9 @@ func _spawn_ghost(dashing: bool) -> void:
 	ghost.scale = scale
 	ghost.color = _char_colour * (3.0 if dashing else 1.5)
 	ghost.z_index = z_index - 1
-	# Add to scene parent to stay fixed in world space
+
 	get_parent().add_child(ghost)
-	
+
 	var tw = create_tween().set_parallel(true)
 	tw.tween_property(ghost, "modulate:a", 0.0, 0.25 if dashing else 0.15)
 	tw.tween_property(ghost, "scale", scale * 0.8, 0.2)
@@ -263,6 +292,20 @@ func _shoot() -> void:
 
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_sfx("shoot")
+
+	var flash := ColorRect.new()
+	flash.color = _char_colour * 4.0
+	flash.size = Vector2(12, 12)
+	flash.pivot_offset = Vector2(6, 6)
+	var spawn_pos2 := global_position
+	var marker2 := get_node_or_null("BulletSpawn")
+	if marker2: spawn_pos2 = marker2.global_position
+	flash.global_position = spawn_pos2 - Vector2(6, 6)
+	get_parent().add_child(flash)
+	var ftw := flash.create_tween().set_parallel(true)
+	ftw.tween_property(flash, "scale", Vector2(2.5, 2.5), 0.08)
+	ftw.tween_property(flash, "modulate:a", 0.0, 0.1)
+	ftw.finished.connect(flash.queue_free)
 
 	if _game:
 		if _free_shoot_timer > 0.0:

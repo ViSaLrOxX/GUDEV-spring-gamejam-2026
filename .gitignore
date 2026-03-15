@@ -11,3 +11,4 @@
 *.avi
 gamejam.tar.gz
 # (Exclude specific Godot config files if needed, but .godot/ is the big one)
+*.zip

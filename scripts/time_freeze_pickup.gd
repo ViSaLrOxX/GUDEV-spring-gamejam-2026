@@ -6,7 +6,7 @@ var _spin_time : float = 0.0
 func _ready() -> void:
 	var poly = get_node_or_null("Polygon2D")
 	if poly:
-		poly.color = Color(0.2, 0.9, 1.0) * 3.0 # Glowing Cyan
+		poly.color = Color(0.2, 0.9, 1.0) * 3.0
 
 func _process(delta: float) -> void:
 	_spin_time += delta

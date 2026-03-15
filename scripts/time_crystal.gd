@@ -6,7 +6,7 @@ var _pulse_time     : float = 0.0
 func _ready() -> void:
 	var poly = get_node_or_null("Polygon2D")
 	if poly:
-		poly.color = Color(1.0, 0.4, 0.8) * 3.0 # Glowing Pink
+		poly.color = Color(1.0, 0.4, 0.8) * 3.0
 
 func _process(delta: float) -> void:
 	rotation     += _rotation_speed * delta

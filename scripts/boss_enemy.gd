@@ -32,8 +32,39 @@ func _ready() -> void:
 	nav_agent.path_desired_distance  = 20.0
 	nav_agent.target_desired_distance = 20.0
 	_apply_phase_visuals()
+	_setup_health_bar()
 	if _game and _game.has_method("trigger_screen_shake"):
 		_game.trigger_screen_shake(0.4, 18.0)
+
+func _setup_health_bar() -> void:
+	var bar_bg := ColorRect.new()
+	bar_bg.name = "HpBarBg"
+	bar_bg.color = Color(0.1, 0.0, 0.0, 0.9)
+	bar_bg.size = Vector2(60, 8)
+	bar_bg.position = Vector2(-30, -45)
+	add_child(bar_bg)
+	var bar_fill := ColorRect.new()
+	bar_fill.name = "HpBar"
+	bar_fill.color = Color(1.0, 0.1, 0.3) * 2.5
+	bar_fill.size = Vector2(60, 8)
+	bar_fill.position = Vector2(-30, -45)
+	add_child(bar_fill)
+	var label := Label.new()
+	label.name = "HpLabel"
+	label.text = "ARCHITECT"
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.5) * 2.0)
+	label.position = Vector2(-30, -58)
+	add_child(label)
+
+func _update_health_bar() -> void:
+	var bar = get_node_or_null("HpBar")
+	if bar:
+		bar.size.x = 60.0 * (float(hp) / float(max_hp))
+		match hp:
+			_ when hp == max_hp: bar.color = Color(1.0, 0.1, 0.3) * 2.5
+			_ when hp > 1: bar.color = Color(1.0, 0.5, 0.0) * 2.5
+			_: bar.color = Color(1.0, 1.0, 0.0) * 2.5
 
 func _apply_phase_visuals() -> void:
 	var poly := get_node_or_null("Polygon2D")
@@ -116,8 +147,10 @@ func hit_by_bullet() -> void:
 	if _is_dead:
 		return
 	hp -= 1
+	_update_health_bar()
 	if _game:
 		_game.trigger_screen_shake(0.25, 22.0)
+		_game.spawn_world_label(global_position, "HIT!", Color(1.0, 0.3, 0.3))
 	if hp <= 0:
 		die()
 	else:
@@ -134,9 +167,9 @@ func die() -> void:
 			get_parent().add_child(b)
 			b.global_position = global_position + Vector2(randf_range(-40, 40), randf_range(-40, 40))
 	if _game:
-		# Count as one kill for the level wipeout progress
+
 		_game.enemy_killed(true)
-		# Add bonus rewards that don't count toward wipeout total
+
 		for i in range(reward_multiplier - 1):
 			_game.enemy_killed(false)
 	queue_free()

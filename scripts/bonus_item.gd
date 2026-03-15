@@ -5,10 +5,10 @@ var _start_y  : float = 0.0
 func _ready() -> void:
 	add_to_group("coins")
 	_start_y = position.y
-	
+
 	var poly = get_node_or_null("Polygon2D")
 	if poly:
-		poly.color = Color(1.0, 0.85, 0.2) * 2.5 # Glowing Gold
+		poly.color = Color(1.0, 0.85, 0.2) * 2.5
 
 func _process(delta: float) -> void:
 	_bob_time  += delta

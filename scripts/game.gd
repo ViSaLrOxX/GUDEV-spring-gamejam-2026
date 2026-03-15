@@ -4,7 +4,7 @@ const SLOW_TIME_SCALE  : float = 0.05
 const NORMAL_TIME_SCALE: float = 1.0
 const TIME_LERP_SPEED  : float = 15.0
 const STARTING_TIME    : float = 30.0
-const BASE_SHOOT_COST  : float = 5.0 
+const BASE_SHOOT_COST  : float = 5.0
 const HIT_COST         : float = 12.0
 const BASE_KILL_REWARD : float = 6.0
 const COMBO_WINDOW     : float = 3.0
@@ -27,6 +27,9 @@ var target_time_scale : float = SLOW_TIME_SCALE
 var _last_real_ms     : int   = 0
 var combo_count       : int   = 0
 var combo_timer       : float = 0.0
+var kill_streak       : int   = 0
+var _streak_timer     : float = 0.0
+const STREAK_TIMEOUT  : float = 5.0
 var shake_duration    : float = 0.0
 var shake_strength    : float = 0.0
 
@@ -49,7 +52,7 @@ var _transition_lock_timer : float = 0.0
 const TRANSITION_DELAY : float = 0.8
 var _was_moving_on_load : bool = true
 
-const BASE_ZOOM : float = 1.5 
+const BASE_ZOOM : float = 1.5
 var _target_zoom : float = BASE_ZOOM
 var _zoom_speed : float = 10.0
 
@@ -115,16 +118,16 @@ func _ready() -> void:
 		var cdata: Dictionary = (preload("res://scripts/character_data.gd") as GDScript).get_by_id(gs.selected_character)
 		_enemy_speed_mult = cdata["enemy_speed_mult"]
 		_game_mode = gs.game_mode
-	
+
 	dynamic_entities = Node2D.new(); dynamic_entities.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_entities)
 	dynamic_walls = Node2D.new(); dynamic_walls.process_mode = Node.PROCESS_MODE_PAUSABLE; add_child(dynamic_walls)
 	if has_node("/root/AudioManager"):
 		get_node("/root/AudioManager").play_music("music.mp3")
 	_setup_screen_shader()
 	_setup_overscreen_hud()
-	
-	# Defer start to ensure HUD and Shaders are fully ready
+
 	call_deferred("_initialize_mode")
+	call_deferred("_setup_offscreen_hud")
 
 func _initialize_mode() -> void:
 	if _game_mode == "tutorial":
@@ -208,7 +211,7 @@ func _setup_overscreen_hud() -> void:
 	var root = Control.new(); root.name = "HudRoot"; root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); ui.add_child(root)
 
 	var tech_cyan = Color(0.2, 0.8, 1.0)
-	var tech_bg = Color(0.01, 0.03, 0.05, 0.45) # More transparent
+	var tech_bg = Color(0.01, 0.03, 0.05, 0.45)
 
 	var base_style = StyleBoxFlat.new()
 	base_style.bg_color = tech_bg
@@ -226,9 +229,8 @@ func _setup_overscreen_hud() -> void:
 		var h_line = ColorRect.new(); h_line.color = decal_color; h_line.custom_minimum_size = Vector2(60, 1); c_box.add_child(h_line)
 		var v_line = ColorRect.new(); v_line.color = decal_color; v_line.custom_minimum_size = Vector2(1, 60); c_box.add_child(v_line)
 
-	# TOP LEFT: Stability + Weapon Stack
 	var tl_container = VBoxContainer.new(); tl_container.position = Vector2(30, 30); tl_container.add_theme_constant_override("separation", 15); root.add_child(tl_container)
-	
+
 	var tl_panel = PanelContainer.new(); tl_panel.add_theme_stylebox_override("panel", base_style); tl_container.add_child(tl_panel)
 	var tl_vbox = VBoxContainer.new(); tl_vbox.custom_minimum_size = Vector2(300, 0); tl_vbox.add_theme_constant_override("separation", 4); tl_panel.add_child(tl_vbox)
 	var time_header = Label.new(); time_header.text = "[ STABILITY ]"; time_header.add_theme_font_size_override("font_size", 14); time_header.modulate = tech_cyan * 2.0; tl_vbox.add_child(time_header)
@@ -244,7 +246,6 @@ func _setup_overscreen_hud() -> void:
 	cooldown_bar = ProgressBar.new(); cooldown_bar.custom_minimum_size = Vector2(0, 10); cooldown_bar.show_percentage = false; bl_vbox.add_child(cooldown_bar)
 	var heat_fg = bar_fg.duplicate(); heat_fg.bg_color = Color(1.0, 0.8, 0.2) * 2.5; cooldown_bar.add_theme_stylebox_override("background", bar_bg); cooldown_bar.add_theme_stylebox_override("fill", heat_fg)
 
-	# TOP RIGHT: Round + Progress
 	var tr_panel = PanelContainer.new(); tr_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT); tr_panel.offset_left = -330; tr_panel.offset_top = 30; tr_panel.offset_right = -30; tr_panel.add_theme_stylebox_override("panel", base_style); root.add_child(tr_panel)
 	var tr_vbox = VBoxContainer.new(); tr_vbox.alignment = BoxContainer.ALIGNMENT_END; tr_panel.add_child(tr_vbox)
 	level_label = Label.new(); level_label.add_theme_font_size_override("font_size", 48); level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT; tr_vbox.add_child(level_label)
@@ -252,15 +253,13 @@ func _setup_overscreen_hud() -> void:
 	progress_bar = ProgressBar.new(); progress_bar.custom_minimum_size = Vector2(250, 8); progress_bar.show_percentage = false; tr_vbox.add_child(progress_bar)
 	var core_fg = bar_fg.duplicate(); core_fg.bg_color = Color(1.0, 0.4, 0.8) * 2.5; progress_bar.add_theme_stylebox_override("background", bar_bg); progress_bar.add_theme_stylebox_override("fill", core_fg)
 
-	# BOTTOM LEFT: MINIMAP
 	var mm_panel = PanelContainer.new(); mm_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); mm_panel.offset_left = 30; mm_panel.offset_bottom = -30; mm_panel.offset_top = -230; mm_panel.offset_right = 230; mm_panel.add_theme_stylebox_override("panel", base_style); root.add_child(mm_panel)
 	var mm_cont = SubViewportContainer.new(); mm_cont.stretch = true; mm_panel.add_child(mm_cont)
 	minimap_view = SubViewport.new(); minimap_view.handle_input_locally = false; minimap_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS; mm_cont.add_child(minimap_view)
 	minimap_cam = Camera2D.new(); minimap_view.add_child(minimap_cam)
-	# Share the world with the main view
+
 	minimap_view.world_2d = get_viewport().world_2d
 
-	# BOTTOM RIGHT: Credits
 	var br_panel = PanelContainer.new(); br_panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); br_panel.offset_left = -220; br_panel.offset_bottom = -30; br_panel.offset_top = -90; br_panel.offset_right = -30; br_panel.add_theme_stylebox_override("panel", base_style); root.add_child(br_panel)
 	var br_hbox = HBoxContainer.new(); br_hbox.alignment = BoxContainer.ALIGNMENT_CENTER; br_hbox.add_theme_constant_override("separation", 10); br_panel.add_child(br_hbox)
 	var icon_style = StyleBoxFlat.new(); icon_style.bg_color = Color.GOLD * 2.0; icon_style.corner_radius_top_left = 10; icon_style.corner_radius_top_right = 10; icon_style.corner_radius_bottom_left = 10; icon_style.corner_radius_bottom_right = 10
@@ -322,26 +321,23 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	cores_required = int(1 + floor(level / 3.0)); time_remaining = STARTING_TIME + (level - 1) * 2.0 + (inventory.count("TIME") * 10.0)
 	for child in dynamic_entities.get_children(): child.queue_free()
 	for child in dynamic_walls.get_children(): child.queue_free()
-	
-	# Ensure map is large enough for all entities (enemies, walls, crystals, coins)
-	# Using 2^level for exponential growth as requested
+
 	var enemy_count = int(pow(2, level))
 	var wall_count = 5 + level
 	var coin_count = 1 + int(level / 2.0)
-	var total_items = enemy_count + wall_count + cores_required + coin_count + 10 
-	
-	# "Snug and tight" - reduced area per item from 35000 to 15000
+	var total_items = enemy_count + wall_count + cores_required + coin_count + 10
+
 	var min_area_required = total_items * 15000.0
-	
+
 	var map_w = 700.0 + (level - 1) * 30.0
 	var map_h = 500.0 + (level - 1) * 22.5
 	var current_area = map_w * map_h
-	
+
 	if current_area < min_area_required:
 		var expansion_factor = sqrt(min_area_required / current_area)
 		map_w *= expansion_factor
 		map_h *= expansion_factor
-	
+
 	_rebuild_boundaries(map_w, map_h)
 	if player: player.global_position = Vector2(map_w / 2.0, map_h / 2.0)
 	var inner_rects = _generate_inner_walls(level, map_w, map_h)
@@ -353,6 +349,7 @@ func _start_level(level: int, open_shop: bool = true) -> void:
 	_rebuild_navigation(map_w, map_h, inner_rects); _spawn_entities(level, map_w, map_h, inner_rects)
 	_last_real_ms = Time.get_ticks_msec(); _update_ui()
 	if open_shop: _open_shop()
+	else: _show_round_intro(level)
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
@@ -388,6 +385,8 @@ func _process(delta: float) -> void:
 			shake_duration -= real_delta; camera.offset = Vector2(randf_range(-shake_strength, shake_strength), randf_range(-shake_strength, shake_strength))
 			if shake_duration <= 0.0: camera.offset = Vector2.ZERO
 
+	_update_offscreen_indicators(real_delta)
+
 	if is_shop_open: return
 
 	if is_waiting_to_start:
@@ -396,7 +395,6 @@ func _process(delta: float) -> void:
 		Engine.time_scale = SLOW_TIME_SCALE
 		return
 
-	# Ability timers
 	if _invisible_timer > 0.0:
 		_invisible_timer -= real_delta
 		if _invisible_timer <= 0.0:
@@ -420,7 +418,6 @@ func _process(delta: float) -> void:
 		if _is_transitioning: Engine.time_scale = 1.0
 		return
 
-	# Ghost enemy safety check
 	_ghost_check_timer -= real_delta
 	if not _is_transitioning and total_enemies_in_level > 0 and _ghost_check_timer <= 0.0:
 		if get_tree().get_nodes_in_group("enemies").size() == 0:
@@ -441,8 +438,11 @@ func _process(delta: float) -> void:
 	if combo_count > 0:
 		combo_timer -= real_delta
 		if combo_timer <= 0.0: combo_count = 0; _update_ui()
+	if kill_streak > 0:
+		_streak_timer -= real_delta
+		if _streak_timer <= 0.0: kill_streak = 0
 	_update_ui()
-	
+
 	if game_active and not _is_transitioning:
 		_replay_record_timer -= real_delta
 		if _replay_record_timer <= 0.0:
@@ -482,7 +482,7 @@ func enemy_killed(count_toward_wipeout: bool = true) -> void:
 	total_enemies_killed += 1
 	if player and player.has_method("enemy_killed_reward"):
 		player.enemy_killed_reward()
-	
+
 	if _game_mode == "tutorial" and _tutorial_step == 4: _advance_tutorial()
 	elif _game_mode == "range": _update_ui(); return
 
@@ -490,10 +490,34 @@ func enemy_killed(count_toward_wipeout: bool = true) -> void:
 		enemies_killed_in_level += 1
 	if _is_dying: _is_dying = false; time_remaining = 3.0
 	combo_count = mini(combo_count + 1, MAX_COMBO); combo_timer = COMBO_WINDOW; var reward = BASE_KILL_REWARD * combo_count; add_time(reward); _show_combo_popup(combo_count, reward); _pulse_zoom(1.02, 20.0)
+
+	if player and combo_count > 1:
+		spawn_world_label(player.global_position + Vector2(randf_range(-30,30), -30),
+			"+%.0fs  ×%d" % [reward, combo_count], Color(1.0, 0.85, 0.1))
+
+	kill_streak += 1
+	_streak_timer = STREAK_TIMEOUT
+	match kill_streak:
+		5:  _show_big_bonus_message("KILL STREAK x5 HUNTING"); add_time(5.0)
+		10: _show_big_bonus_message("KILL STREAK x10 RAMPAGE"); add_time(10.0)
+		20: _show_big_bonus_message("KILL STREAK x20 UNSTOPPABLE"); add_time(20.0)
+		30: _show_big_bonus_message("KILL STREAK x30 SIMULATION BREAKING"); add_time(30.0)
 	if count_toward_wipeout and enemies_killed_in_level >= total_enemies_in_level:
 		if has_node("/root/AudioManager"):
 			get_node("/root/AudioManager").play_sfx("explosion")
-		_show_big_bonus_message("WIPEOUT!"); total_coins_collected += 50; _initiate_level_transition(0.3)
+		var speed_bonus := 0
+		if time_remaining > 20.0:
+			speed_bonus = int(time_remaining * 0.5)
+			total_coins_collected += speed_bonus
+			_show_big_bonus_message("SPEED CLEAR: +%d CREDITS" % speed_bonus)
+		else:
+			_show_big_bonus_message("WIPEOUT!")
+		total_coins_collected += 50
+		_initiate_level_transition(0.3)
+	elif count_toward_wipeout:
+		var remaining := total_enemies_in_level - enemies_killed_in_level
+		if remaining == 1:
+			_show_big_bonus_message("LAST TARGET")
 
 func _initiate_level_transition(delay: float) -> void:
 	if _is_transitioning: return
@@ -508,7 +532,7 @@ func _show_round_complete_menu() -> void:
 	var canvas = CanvasLayer.new(); canvas.name = "RoundCompleteUI"; canvas.layer = 50; add_child(canvas)
 	var center = CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
 	var panel = PanelContainer.new(); panel.custom_minimum_size = Vector2(400, 200); center.add_child(panel)
-	
+
 	var tech_cyan = Color(0.2, 0.8, 1.0); var tech_bg = Color(0.01, 0.03, 0.05, 0.95)
 	var p_style = StyleBoxFlat.new(); p_style.bg_color = tech_bg; p_style.border_width_left = 4; p_style.border_width_top = 4; p_style.border_color = tech_cyan; p_style.skew = Vector2(0.05, 0.0); p_style.shadow_color = tech_cyan * 0.3; p_style.shadow_size = 20
 	p_style.content_margin_left = 30; p_style.content_margin_right = 30; p_style.content_margin_top = 30; p_style.content_margin_bottom = 30
@@ -516,11 +540,18 @@ func _show_round_complete_menu() -> void:
 
 	var vbox = VBoxContainer.new(); vbox.add_theme_constant_override("separation", 20); panel.add_child(vbox)
 	var title = Label.new(); title.text = "/// ROUND COMPLETE"; title.add_theme_font_size_override("font_size", 32); title.add_theme_color_override("font_color", tech_cyan * 2.0); title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; vbox.add_child(title)
+
+	var stats_row := HBoxContainer.new(); stats_row.alignment = BoxContainer.ALIGNMENT_CENTER; stats_row.add_theme_constant_override("separation", 30); vbox.add_child(stats_row)
+	for pair in [["KILLS", str(enemies_killed_in_level)], ["TIME LEFT", "%.1fs" % time_remaining], ["CREDITS", str(total_coins_collected)]]:
+		var sv := VBoxContainer.new(); sv.alignment = BoxContainer.ALIGNMENT_CENTER; stats_row.add_child(sv)
+		var lv := Label.new(); lv.text = pair[0]; lv.add_theme_font_size_override("font_size", 13); lv.modulate = Color.GRAY; lv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sv.add_child(lv)
+		var rv := Label.new(); rv.text = pair[1]; rv.add_theme_font_size_override("font_size", 24); rv.add_theme_color_override("font_color", tech_cyan * 2.0); rv.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sv.add_child(rv)
+
 	vbox.add_child(HSeparator.new())
-	
+
 	var btn_style = StyleBoxFlat.new(); btn_style.bg_color = Color(0.1, 0.2, 0.3, 0.4); btn_style.border_width_left = 2; btn_style.border_color = tech_cyan * 0.5; btn_style.skew = Vector2(0.1, 0.0)
 	var btn_hover = btn_style.duplicate(); btn_hover.bg_color = tech_cyan * 0.2; btn_hover.border_color = tech_cyan * 2.0
-	
+
 	var btn_replay = Button.new(); btn_replay.text = ">> WATCH TACTICAL REPLAY"; btn_replay.custom_minimum_size = Vector2(0, 60); btn_replay.add_theme_stylebox_override("normal", btn_style); btn_replay.add_theme_stylebox_override("hover", btn_hover)
 	btn_replay.pressed.connect(func():
 		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
@@ -528,7 +559,7 @@ func _show_round_complete_menu() -> void:
 		_start_replay_mode()
 	)
 	vbox.add_child(btn_replay)
-	
+
 	var btn_next = Button.new(); btn_next.text = ">> INITIATE NEXT SEQUENCE"; btn_next.custom_minimum_size = Vector2(0, 60); btn_next.add_theme_stylebox_override("normal", btn_style); btn_next.add_theme_stylebox_override("hover", btn_hover)
 	btn_next.pressed.connect(func():
 		if has_node("/root/AudioManager"): get_node("/root/AudioManager").play_sfx("click")
@@ -546,7 +577,7 @@ func _start_replay_mode() -> void:
 	for c in get_children():
 		if c.is_in_group("player_bullets") or c.is_in_group("enemy_projectiles"):
 			c.visible = false
-			
+
 	var viewer = preload("res://scripts/replay_viewer.gd").new()
 	viewer.name = "ReplayViewer"
 	viewer.setup(_replay_frames, _replay_metadata, camera)
@@ -580,7 +611,7 @@ func _record_replay_frame() -> void:
 		var ppoly = player.get_node_or_null("Polygon2D")
 		var c = ppoly.color if ppoly else Color.WHITE
 		ents.append([0, p_pos.x, p_pos.y, player.global_rotation, player.scale.x, player.scale.y, c.r, c.g, c.b, c.a])
-	
+
 	if dynamic_entities:
 		for child in dynamic_entities.get_children():
 			if child.is_in_group("enemies"):
@@ -590,14 +621,14 @@ func _record_replay_frame() -> void:
 			elif child.name.begins_with("Coin") or child.name.begins_with("Crystal") or child.name.begins_with("TimeFreeze") or child.name.begins_with("TimeWarp"):
 				var sc = child.scale
 				ents.append([3, child.global_position.x, child.global_position.y, 0.0, sc.x, sc.y, 1.0, 1.0, 0.0, 1.0])
-	
+
 	for child in get_children():
 		if child.is_in_group("player_bullets") or child.is_in_group("enemy_projectiles"):
 			ents.append([2, child.global_position.x, child.global_position.y, child.global_rotation, 1.0, 1.0, 1.0, 1.0, 0.5, 1.0])
-			
+
 	_replay_frames.append({
 		"time": total_time_elapsed,
-		"cam_pos": p_pos, # Record player pos as cam focus
+		"cam_pos": p_pos,
 		"ents": ents
 	})
 
@@ -607,11 +638,20 @@ func _pulse_zoom(amt: float, speed: float) -> void:
 
 func collect_core() -> void:
 	cores_collected += 1
-	if cores_collected >= cores_required: _unlock_portal(); _pulse_zoom(BASE_ZOOM + 0.1, 15.0)
+	spawn_world_label(player.global_position if player else Vector2(640,360), "CORE +1", Color(1.0, 0.4, 0.9))
+	if has_node("/root/AudioManager"):
+		get_node("/root/AudioManager").play_sfx("pickup")
+	if cores_collected >= cores_required:
+		_unlock_portal()
+		_pulse_zoom(BASE_ZOOM + 0.1, 15.0)
+		_show_big_bonus_message("PORTAL UNLOCKED")
 	_update_ui()
 
 func collect_coin() -> void:
-	coins_collected += 1; total_coins_collected += 1; _update_ui()
+	coins_collected += 1
+	total_coins_collected += 1
+	spawn_world_label(player.global_position if player else Vector2(640,360), "+%d CREDITS" % 10, Color(1.0, 0.85, 0.1))
+	_update_ui()
 
 func collect_time_freeze(bonus: float) -> void:
 	add_time(bonus); _flash_timer_label()
@@ -635,11 +675,11 @@ func update_ability_bar(charge: float, max_charge: float, ready: bool, colour: C
 
 func trigger_bullet_time(duration: float) -> void:
 	_bullet_time_active = true; _bullet_time_timer = duration; target_time_scale = 0.02
-	trigger_screen_shake(0.2, 8.0); _show_big_bonus_message("OVERCLOCK — %.0fs" % duration)
+	trigger_screen_shake(0.2, 8.0); _show_big_bonus_message("OVERCLOCK %.0fs" % duration)
 
 func trigger_invisibility(duration: float) -> void:
 	player_invisible = true; _invisible_timer = duration
-	trigger_screen_shake(0.2, 6.0); _show_big_bonus_message("SPECTRAL VEIL — %.0fs" % duration)
+	trigger_screen_shake(0.2, 6.0); _show_big_bonus_message("SPECTRAL VEIL %.0fs" % duration)
 
 func trigger_purge_wipeout() -> void:
 	var enemies := get_tree().get_nodes_in_group("enemies")
@@ -651,20 +691,190 @@ func activate_time_warp(duration: float) -> void:
 	_time_warp_active = true; _time_warp_timer = duration; Engine.time_scale = 1.0; target_time_scale = 1.0
 	trigger_screen_shake(0.3, 10.0); _show_big_bonus_message("TIME WARP!")
 
+func trigger_stasis(duration: float) -> void:
+
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	for e in enemies:
+		if is_instance_valid(e):
+			e.process_mode = Node.PROCESS_MODE_DISABLED
+	trigger_screen_shake(0.4, 12.0)
+	_show_big_bonus_message("STASIS FIELD %.0fs" % duration)
+
+	var stasis_tween = create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	stasis_tween.tween_interval(duration)
+	stasis_tween.tween_callback(func():
+		var frozen = get_tree().get_nodes_in_group("enemies")
+		for e in frozen:
+			if is_instance_valid(e):
+				e.process_mode = Node.PROCESS_MODE_PAUSABLE
+		_show_big_bonus_message("STASIS LIFTED")
+	)
+
+func trigger_sync_blast() -> void:
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	var count = enemies.size()
+	for e in enemies:
+		if is_instance_valid(e) and e.has_method("take_damage"):
+			e.take_damage(40.0)
+	trigger_screen_shake(0.6, 30.0)
+	_show_big_bonus_message("SYNC BLAST: %d TARGETS HIT" % count)
+
+	if player:
+		for i in range(3):
+			var ring = ColorRect.new()
+			ring.color = Color(0.4, 0.6, 1.0, 0.5)
+			ring.size = Vector2(20, 20)
+			ring.pivot_offset = Vector2(10, 10)
+			ring.global_position = player.global_position - Vector2(10, 10)
+			add_child(ring)
+			var tw = ring.create_tween().set_parallel(true)
+			tw.tween_property(ring, "scale", Vector2(40.0, 40.0), 0.4).set_delay(i * 0.1)
+			tw.tween_property(ring, "modulate:a", 0.0, 0.4).set_delay(i * 0.1)
+			tw.finished.connect(ring.queue_free)
+
 func trigger_screen_shake(duration: float, strength: float) -> void:
 	shake_duration = duration; shake_strength = strength
+
+func _show_round_intro(level: int) -> void:
+	var root = get_node_or_null("UI/HudRoot")
+	if not root: return
+	var canvas := CanvasLayer.new(); canvas.layer = 15; add_child(canvas)
+	var center := CenterContainer.new(); center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); canvas.add_child(center)
+	var vbox := VBoxContainer.new(); vbox.alignment = BoxContainer.ALIGNMENT_CENTER; center.add_child(vbox)
+
+	var sub := Label.new(); sub.text = "/// SEQUENCE INITIATED"
+	sub.add_theme_font_size_override("font_size", 22)
+	sub.add_theme_color_override("font_color", Color(0.2, 0.8, 1.0))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(sub)
+
+	var lbl := Label.new(); lbl.text = "ROUND  %02d" % level
+	lbl.add_theme_font_size_override("font_size", 96)
+	lbl.add_theme_color_override("font_color", Color.WHITE * 3.0)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(lbl)
+
+	var threat := Label.new()
+	var enemy_count := int(pow(2, level))
+	threat.text = "%d THREATS DETECTED" % enemy_count
+	threat.add_theme_font_size_override("font_size", 26)
+	threat.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2) * 2.0)
+	threat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(threat)
+
+	center.modulate.a = 0.0
+	var tw := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(center, "modulate:a", 1.0, 0.25)
+	tw.chain().tween_interval(1.2)
+	tw.chain().tween_property(canvas, "modulate:a", 0.0, 0.4)
+	tw.chain().tween_callback(canvas.queue_free)
+
+func spawn_world_label(world_pos: Vector2, text: String, colour: Color) -> void:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", colour * 2.5)
+	lbl.z_index = 10
+
+	var screen_pos = world_pos
+	if camera:
+		screen_pos = camera.get_viewport().get_canvas_transform() * world_pos
+	lbl.position = screen_pos + Vector2(-20, -10)
+	$UI.add_child(lbl)
+	var tw = lbl.create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel(true)
+	tw.tween_property(lbl, "position", lbl.position + Vector2(randf_range(-15, 15), -40), 0.7)
+	tw.tween_property(lbl, "modulate:a", 0.0, 0.7).set_delay(0.2)
+	tw.finished.connect(lbl.queue_free)
+
+var _offscreen_arrows: Array = []
+var _danger_overlay: ColorRect = null
+var _danger_pulse_timer: float = 0.0
+
+func _setup_offscreen_hud() -> void:
+	var root = get_node_or_null("UI/HudRoot")
+	if not root: return
+
+	_danger_overlay = ColorRect.new()
+	_danger_overlay.name = "DangerOverlay"
+	_danger_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_danger_overlay.color = Color(1.0, 0.0, 0.0, 0.0)
+	_danger_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_danger_overlay.z_index = 5
+	root.add_child(_danger_overlay)
+
+func _update_offscreen_indicators(real_delta: float) -> void:
+	if not camera or not game_active or is_shop_open: return
+	var vp_size := get_viewport().get_visible_rect().size
+	var cam_pos := camera.global_position
+	var zoom_val := camera.zoom.x
+	var half_w := (vp_size.x * 0.5) / zoom_val
+	var half_h := (vp_size.y * 0.5) / zoom_val
+	var screen_rect := Rect2(cam_pos - Vector2(half_w, half_h), Vector2(half_w * 2, half_h * 2))
+	var margin := 40.0
+
+	for a in _offscreen_arrows:
+		if is_instance_valid(a): a.queue_free()
+	_offscreen_arrows.clear()
+
+	var root = get_node_or_null("UI/HudRoot")
+	if not root: return
+
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	for e in enemies:
+		if not is_instance_valid(e): continue
+		if screen_rect.has_point(e.global_position): continue
+
+		var dir: Vector2 = (e.global_position - cam_pos).normalized()
+		var angle := dir.angle()
+
+		var tx = half_w / abs(dir.x) if dir.x != 0.0 else INF
+		var ty = half_h / abs(dir.y) if dir.y != 0.0 else INF
+		var t := minf(tx, ty)
+		var edge_world := cam_pos + dir * t
+
+		var edge_screen := (edge_world - cam_pos) * zoom_val + vp_size * 0.5
+		edge_screen.x = clampf(edge_screen.x, margin, vp_size.x - margin)
+		edge_screen.y = clampf(edge_screen.y, margin, vp_size.y - margin)
+
+		var arrow := Label.new()
+		arrow.text = "▶"
+		arrow.add_theme_font_size_override("font_size", 18)
+		arrow.add_theme_color_override("font_color", Color(1.0, 0.3, 0.2) * 2.5)
+		arrow.pivot_offset = Vector2(9, 9)
+		arrow.rotation = angle
+		arrow.position = edge_screen - Vector2(9, 9)
+		arrow.modulate.a = 0.85
+		root.add_child(arrow)
+		_offscreen_arrows.append(arrow)
+
+	if _danger_overlay:
+		if time_remaining < 10.0 and not _is_dying == false:
+			_danger_pulse_timer += real_delta * 4.0
+			_danger_overlay.color = Color(1.0, 0.0, 0.0, abs(sin(_danger_pulse_timer)) * 0.18)
+		else:
+			_danger_overlay.color = Color(1.0, 0.0, 0.0, 0.0)
+			_danger_pulse_timer = 0.0
 
 func _unlock_portal() -> void:
 	portal_unlocked = true; if portal_instance: portal_instance.activate()
 
 func _trigger_game_over() -> void:
-	game_active = false; Engine.time_scale = 1.0
-	var is_new_best := false
-	if Engine.has_singleton("Highscore"):
-		is_new_best = Engine.get_singleton("Highscore").submit(current_level, total_enemies_killed, total_time_elapsed)
-	elif has_node("/root/Highscore"):
-		is_new_best = get_node("/root/Highscore").submit(current_level, total_enemies_killed, total_time_elapsed)
-	_show_game_over_screen(is_new_best)
+	game_active = false
+
+	Engine.time_scale = 0.05
+	trigger_screen_shake(1.5, 20.0)
+	_show_big_bonus_message("SYSTEM FAILURE")
+	var dtw := create_tween().set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	dtw.tween_interval(1.5)
+	dtw.tween_callback(func():
+		Engine.time_scale = 1.0
+		var is_new_best := false
+		if Engine.has_singleton("Highscore"):
+			is_new_best = Engine.get_singleton("Highscore").submit(current_level, total_enemies_killed, total_time_elapsed)
+		elif has_node("/root/Highscore"):
+			is_new_best = get_node("/root/Highscore").submit(current_level, total_enemies_killed, total_time_elapsed)
+		_show_game_over_screen(is_new_best)
+	)
 
 func _open_shop() -> void:
 	if is_shop_open: return
@@ -833,11 +1043,12 @@ func _update_ui() -> void:
 		elif _shot_heat_multiplier > 0: cooldown_bar.modulate = Color.ORANGE * 2.5
 		else: cooldown_bar.modulate = Color.WHITE
 	if progress_bar: progress_bar.max_value = cores_required; progress_bar.value = cores_collected
-	if level_label: 
+	if level_label:
 		level_label.text = "ROUND %02d" % current_level
 		if _game_mode == "range": level_label.text = "TRAINING"
 	if enemies_remaining_label:
-		enemies_remaining_label.text = "THREATS: %d / %d" % [total_enemies_in_level - enemies_killed_in_level, total_enemies_in_level]
+		var streak_txt := ("  |  STREAK ×%d" % kill_streak) if kill_streak >= 3 else ""
+		enemies_remaining_label.text = "THREATS: %d / %d%s" % [total_enemies_in_level - enemies_killed_in_level, total_enemies_in_level, streak_txt]
 		if _game_mode == "range": enemies_remaining_label.text = "PURGED: %d" % total_enemies_killed
 	if coins_bank_label: coins_bank_label.text = "%04d" % total_coins_collected
 	if inventory_label: inventory_label.text = "STORAGE: %d / %d" % [inventory.size(), int(1 + floor(current_level / 10.0))]
@@ -850,10 +1061,43 @@ func _rebuild_boundaries(w: float, h: float) -> void:
 		minimap_cam.global_position = Vector2(w / 2.0, h / 2.0)
 		var zoom_w = 200.0 / (w + 100.0); var zoom_h = 200.0 / (h + 100.0)
 		minimap_cam.zoom = Vector2.ONE * minf(zoom_w, zoom_h)
-	if bg: bg.size = Vector2(w, h); bg.color = Color(0, 0, 0)
+	if bg:
+		bg.size = Vector2(w, h)
+		bg.color = Color(0, 0, 0)
+
+	var existing_grid = get_node_or_null("ArenaGrid")
+	if existing_grid: existing_grid.queue_free()
+	var grid := Node2D.new()
+	grid.name = "ArenaGrid"
+	add_child(grid)
+	var grid_color := Color(0.2, 0.8, 1.0, 0.04)
+	var cell := 60.0
+	var grid_draw := Node2D.new()
+	grid_draw.set_script(null)
+	grid.add_child(grid_draw)
+	var lines := []
+	var x := 0.0
+	while x <= w:
+		lines.append([Vector2(x, 0), Vector2(x, h)])
+		x += cell
+	var y := 0.0
+	while y <= h:
+		lines.append([Vector2(0, y), Vector2(w, y)])
+		y += cell
+	for pair in lines:
+		var lr := Line2D.new()
+		lr.default_color = grid_color
+		lr.width = 1.0
+		lr.add_point(pair[0])
+		lr.add_point(pair[1])
+		grid.add_child(lr)
+
 	var walls = get_node_or_null("Walls")
 	if walls:
-		walls.get_node("TopWall").position = Vector2(w/2, 10); walls.get_node("TopWall").shape.size = Vector2(w, 20); walls.get_node("BottomWall").position = Vector2(w/2, h - 10); walls.get_node("BottomWall").shape.size = Vector2(w, 20); walls.get_node("LeftWall").position = Vector2(10, h/2); walls.get_node("LeftWall").shape.size = Vector2(20, h); walls.get_node("RightWall").position = Vector2(w - 10, h/2); walls.get_node("RightWall").shape.size = Vector2(20, h)
+		walls.get_node("TopWall").position = Vector2(w/2, 10); walls.get_node("TopWall").shape.size = Vector2(w, 20)
+		walls.get_node("BottomWall").position = Vector2(w/2, h - 10); walls.get_node("BottomWall").shape.size = Vector2(w, 20)
+		walls.get_node("LeftWall").position = Vector2(10, h/2); walls.get_node("LeftWall").shape.size = Vector2(20, h)
+		walls.get_node("RightWall").position = Vector2(w - 10, h/2); walls.get_node("RightWall").shape.size = Vector2(20, h)
 	var wall_visuals = get_node_or_null("WallVisuals")
 	if wall_visuals:
 		for child in wall_visuals.get_children(): child.queue_free()
@@ -867,11 +1111,11 @@ func _add_rim_lit_rect(parent: Node, pos: Vector2, size: Vector2) -> void:
 	var line = ReferenceRect.new(); line.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); line.editor_only = false; line.border_color = Color(0.2, 0.8, 1.0) * 2.0; line.border_width = 2.0; r.add_child(line)
 
 func _generate_inner_walls(level: int, w: float, h: float) -> Array:
-	var rects = []; 
-	# Smaller but more frequent walls
-	var num_walls = randi_range(8 + level * 2, 12 + level * 4); 
-	var sz = minf(w, h) * 0.2; 
-	var safe_zone = Rect2(w/2.0 - sz, h/2.0 - sz, sz * 2.0, sz * 2.0); 
+	var rects = [];
+
+	var num_walls = randi_range(8 + level * 2, 12 + level * 4);
+	var sz = minf(w, h) * 0.2;
+	var safe_zone = Rect2(w/2.0 - sz, h/2.0 - sz, sz * 2.0, sz * 2.0);
 	var static_body = StaticBody2D.new(); static_body.collision_layer = 6; dynamic_walls.add_child(static_body)
 	for i in range(num_walls):
 		var wall_w = randf_range(20, 80); var wall_h = randf_range(20, 80)
@@ -901,13 +1145,13 @@ func _rebuild_navigation(w: float, h: float, inner_rects: Array) -> void:
 	NavigationServer2D.region_set_navigation_polygon(nav_region.get_region_rid(), poly)
 
 func _get_random_pos(w: float, h: float, inner_rects: Array, safe_zone: Rect2) -> Vector2:
-	for i in range(500): # Increased retries for snug map
+	for i in range(500):
 		var p = Vector2(randf_range(80, w - 80), randf_range(80, h - 80)); if safe_zone.has_point(p): continue
-		var valid = true; for r in inner_rects: if r.grow(40.0).has_point(p): valid = false; break # Tightened grow from 50 to 40
+		var valid = true; for r in inner_rects: if r.grow(40.0).has_point(p): valid = false; break
 		if valid: return p
 	for i in range(100):
 		var p = Vector2(randf_range(50, w - 50), randf_range(50, h - 50))
-		var valid = true; for r in inner_rects: if r.grow(20.0).has_point(p): valid = false; break # Tightened grow from 30 to 20
+		var valid = true; for r in inner_rects: if r.grow(20.0).has_point(p): valid = false; break
 		if valid: return p
 	return Vector2(w/2.0, h/2.0) + Vector2(randf_range(-50, 50), randf_range(-50, 50))
 
@@ -943,6 +1187,11 @@ func _spawn_entities(level: int, w: float, h: float, inner_rects: Array) -> void
 		elif e.enemy_type == "ranged": e.shoot_cooldown = maxf(1.0, 2.5 - level * 0.05); e.move_speed = randf_range(50.0, 70.0 + level * 1.5) * _enemy_speed_mult; e.aggro_range = 500.0 + level * 5.0
 		elif e.enemy_type == "turret": e.shoot_cooldown = maxf(1.2, 3.0 - level * 0.1); e.aggro_range = 600.0 + level * 10.0
 		elif e.enemy_type == "patrol": e.move_speed = randf_range(80.0, 100.0 + level * 2.0) * _enemy_speed_mult
+
+		if level >= 6:
+			var hp_bonus = int((level - 5) / 3)
+			e.max_hp = 1 + hp_bonus
+			e.hp = e.max_hp
 		dynamic_entities.add_child(e)
 	total_enemies_in_level += num_enemies
 

@@ -1,6 +1,5 @@
 extends Node
 
-# Use load() instead of preload() to prevent compile-time crashes if files are missing
 var sounds = {}
 
 func _ready() -> void:
@@ -18,7 +17,7 @@ func _load_sounds() -> void:
 		"click": "click.mp3",
 		"explosion": "explosion.mp3"
 	}
-	
+
 	for key in to_load:
 		var full_path = sfx_path + to_load[key]
 		if FileAccess.file_exists(full_path):
@@ -87,16 +86,16 @@ func play_sfx(sound_name: String, pitch_rng: float = 0.1) -> void:
 	if not sounds.has(sound_name) or sounds[sound_name] == null:
 		print("[AudioManager] Cannot play: ", sound_name)
 		return
-		
+
 	var player = _pool[_next_player]
 	player.stream = sounds[sound_name]
-	
+
 	var sfx_val = _sfx_volumes.get(sound_name, 1.0)
 	player.volume_db = linear_to_db(sfx_val * _master_volume)
-	
+
 	player.pitch_scale = randf_range(1.0 - pitch_rng, 1.0 + pitch_rng)
 	player.play()
-	
+
 	_next_player = (_next_player + 1) % _pool_size
 
 func stop_all() -> void:

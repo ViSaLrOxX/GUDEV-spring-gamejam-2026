@@ -5,17 +5,17 @@ var time_damage : float = 8.0
 func _ready() -> void:
 	add_to_group("enemy_projectiles")
 	area_entered.connect(_on_area_entered)
-	
+
 	var poly = get_node_or_null("Polygon2D")
 	if poly:
-		poly.visible = false # Hide square poly
-	
+		poly.visible = false
+
 	queue_redraw()
 
 func _draw() -> void:
 	var color = Color(1.0, 0.2, 0.2) * 3.0
 	draw_circle(Vector2.ZERO, 6.0, color)
-	# Inner core
+
 	draw_circle(Vector2.ZERO, 3.0, Color.WHITE * 2.0)
 
 func _on_area_entered(area: Area2D) -> void:
