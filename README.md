@@ -1,4 +1,3 @@
-# CHRONO//BREACH
 GUDEV Gamejam 16, Spring 2026. Theme: Time.
 
 Top-down shooter where time is your health. It only counts down while you move. Stand still and the world almost freezes. Keep moving and stay alive, but every step costs you.
@@ -12,11 +11,11 @@ Kill enemies to earn time back. Grab the time cores scattered across the map to 
 You need Godot 4, free at godotengine.org.
 
 1. Open Godot 4
-2. Hit **Import** on the Project Manager screen
+2. Hit Import on the Project Manager screen
 3. Find this folder and select `project.godot`
-4. Click **Import and Edit**
+4. Click Import and Edit
 5. Give it a few seconds to import the assets
-6. Press **F5** or the Play button and you're in
+6. Press F5 or the Play button and you're in
 
 ---
 
